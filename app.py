@@ -100,25 +100,6 @@ st.markdown("""
         color: #aaaacc !important;
         border-radius: 8px !important;
     }
-
-    /* Stepper buttons */
-    .stepper-minus button, .stepper-plus button {
-        font-size: 1.2rem !important;
-        font-weight: 700 !important;
-        padding: 0 !important;
-        min-height: 2rem !important;
-        height: 2rem !important;
-        width: 2rem !important;
-        border-radius: 50% !important;
-    }
-    .stepper-minus button {
-        color: #e63946 !important;
-        border-color: #e63946 !important;
-    }
-    .stepper-plus button {
-        color: #32d74b !important;
-        border-color: #32d74b !important;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -128,6 +109,8 @@ def get_supabase() -> Client:
 
 supabase     = get_supabase()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "re_BoUo8RP6_JcZcx4yCpNHFxENw45K5tvzg")
+NOTIFY_EMAIL   = "sebastian@lilbeecreative.com"
 
 ARCHIVE_FILE    = "mantle_archive.csv"
 ARCHIVE_HEADERS = [
@@ -142,6 +125,36 @@ EBAY_COLUMNS = [
     "UPC", "Price", "Quantity", "Item photo URL",
     "Condition ID", "Description", "Format",
 ]
+
+# ------------------------------------------------------------------ #
+#  EMAIL
+# ------------------------------------------------------------------ #
+
+def send_issue_email(description: str, submitted_at: str):
+    """Send email notification via Resend when a new issue is submitted."""
+    try:
+        requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from":    "Mantle Scanner <onboarding@resend.dev>",
+                "to":      [NOTIFY_EMAIL],
+                "subject": "New Issue Submitted — Mantle Scanner",
+                "html":    f"""
+                    <h2>New Issue Submitted</h2>
+                    <p><strong>Submitted at:</strong> {submitted_at}</p>
+                    <p><strong>Description:</strong></p>
+                    <p>{description}</p>
+                    <hr>
+                    <p style="color:#999; font-size:12px;">Mantle Hydraulics — Scanner System</p>
+                """,
+            }
+        )
+    except Exception as e:
+        st.error(f"Email failed: {e}")
 
 # ------------------------------------------------------------------ #
 #  HELPERS
@@ -177,7 +190,6 @@ def image_exists(url: str) -> bool:
         return False
 
 def update_quantity(item_id: str, qty: int):
-    """Write quantity change to Supabase."""
     try:
         supabase.table("listings").update({"quantity": qty}).eq("id", item_id).execute()
     except Exception as e:
@@ -187,8 +199,8 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
     output = io.StringIO()
     writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
     writer.writerow(["#INFO,Version=0.0.2,Template= eBay-draft-listings-template_US"])
-    writer.writerow(["#INFO Action and Category ID are required fields. 1) Set Action to Draft 2) Please find the category ID for your listings here: https://pages.ebay.com/sellerinformation/news/categorychanges.html"])
-    writer.writerow(["#INFO After you've successfully uploaded your draft from the Seller Hub Reports tab, complete your drafts to active listings here: https://www.ebay.com/sh/lst/drafts"])
+    writer.writerow(["#INFO Action and Category ID are required fields."])
+    writer.writerow(["#INFO After you've successfully uploaded your draft from the Seller Hub Reports tab, complete your drafts here: https://www.ebay.com/sh/lst/drafts"])
     writer.writerow(["#INFO"])
     writer.writerow(EBAY_COLUMNS)
     for _, row in df.iterrows():
@@ -233,6 +245,21 @@ def fetch_listings():
         )
     return df
 
+@st.cache_data(ttl=30)
+def fetch_issues():
+    result = (
+        supabase.table("issues")
+        .select("*")
+        .order("submitted_at", desc=True)
+        .execute()
+    )
+    if not result.data:
+        return pd.DataFrame()
+    df = pd.DataFrame(result.data)
+    if "submitted_at" in df.columns:
+        df["submitted_at"] = pd.to_datetime(df["submitted_at"], errors="coerce", utc=True)
+    return df
+
 # ------------------------------------------------------------------ #
 #  HEADER
 # ------------------------------------------------------------------ #
@@ -270,224 +297,280 @@ if df.empty:
         <div style="font-size:0.85rem; margin-top:0.5rem;">Photos added to Supabase will appear here automatically</div>
     </div>
     """, unsafe_allow_html=True)
-    st.stop()
+else:
+    # ---- METRICS ---------------------------------------------------- #
 
-# ---- METRICS ---------------------------------------------------- #
+    total_items = len(df)
+    total_value = df["price"].sum() if "price" in df.columns else 0
 
-total_items = len(df)
-total_value = df["price"].sum() if "price" in df.columns else 0
+    m1, m2 = st.columns(2)
+    m1.metric("Items in Batch", total_items)
+    m2.metric("Batch Value",    f"${total_value:,.2f}")
 
-m1, m2 = st.columns(2)
-m1.metric("Items in Batch", total_items)
-m2.metric("Batch Value",    f"${total_value:,.2f}")
+    st.divider()
 
-st.divider()
+    # ---- PHOTO GALLERY WITH QUANTITY STEPPERS ----------------------- #
 
-# ---- PHOTO GALLERY WITH QUANTITY STEPPERS ----------------------- #
+    st.markdown(
+        "<p style='color:#6b6b7b; font-size:0.75rem; text-transform:uppercase; "
+        "letter-spacing:0.08em; font-weight:500; margin-bottom:1rem;'>Item Gallery</p>",
+        unsafe_allow_html=True
+    )
 
-st.markdown(
-    "<p style='color:#6b6b7b; font-size:0.75rem; text-transform:uppercase; "
-    "letter-spacing:0.08em; font-weight:500; margin-bottom:1rem;'>Item Gallery</p>",
-    unsafe_allow_html=True
-)
+    PLACEHOLDER = """
+    <div style='background:#1a1a1f; border:1px solid #2a2a32; border-radius:8px;
+    height:140px; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; color:#6b6b7b;'>
+    <div style='font-size:1.8rem;'>📷</div>
+    <div style='font-size:0.7rem; margin-top:4px;'>No image</div>
+    </div>
+    """
 
-PLACEHOLDER = """
-<div style='background:#1a1a1f; border:1px solid #2a2a32; border-radius:8px;
-height:140px; display:flex; flex-direction:column; align-items:center;
-justify-content:center; color:#6b6b7b;'>
-<div style='font-size:1.8rem;'>📷</div>
-<div style='font-size:0.7rem; margin-top:4px;'>No image</div>
-</div>
-"""
+    if "quantities" not in st.session_state:
+        st.session_state.quantities = {}
 
-# Keep quantity state in session so steppers are responsive
-if "quantities" not in st.session_state:
-    st.session_state.quantities = {}
-
-# Seed from DB values on first load
-for _, item in df.iterrows():
-    item_id = str(item.get("id", ""))
-    if item_id and item_id not in st.session_state.quantities:
-        st.session_state.quantities[item_id] = int(item.get("quantity", 0))
-
-COLS_PER_ROW = 5
-rows = [df.iloc[i:i+COLS_PER_ROW] for i in range(0, len(df), COLS_PER_ROW)]
-
-for row_df in rows:
-    cols = st.columns(COLS_PER_ROW)
-    for col, (_, item) in zip(cols, row_df.iterrows()):
+    for _, item in df.iterrows():
         item_id = str(item.get("id", ""))
-        with col:
-            # Photo
-            pid = str(item.get("photo_id", ""))
-            url = photo_url(pid)
-            if url and image_exists(url):
-                st.image(url, use_container_width=True)
-            else:
-                st.markdown(PLACEHOLDER, unsafe_allow_html=True)
+        if item_id and item_id not in st.session_state.quantities:
+            st.session_state.quantities[item_id] = int(item.get("quantity", 0))
 
-            # Title and price
-            title = str(item.get("title", "Unknown"))
-            price = float(item.get("price", 0.0))
-            st.markdown(
-                f"<div style='color:#aaaacc; font-size:0.72rem; margin-top:0.3rem; "
-                f"overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' "
-                f"title='{title}'>{title}</div>"
-                f"<div style='color:#ffffff; font-size:0.85rem; font-weight:600; "
-                f"margin-top:0.1rem;'>${price:.2f}</div>",
-                unsafe_allow_html=True
-            )
+    COLS_PER_ROW = 5
+    rows = [df.iloc[i:i+COLS_PER_ROW] for i in range(0, len(df), COLS_PER_ROW)]
 
-            # Quantity stepper — minus | count | plus
-            current_qty = st.session_state.quantities.get(item_id, 0)
-            q_col1, q_col2, q_col3 = st.columns([1, 1, 1])
+    for row_df in rows:
+        cols = st.columns(COLS_PER_ROW)
+        for col, (_, item) in zip(cols, row_df.iterrows()):
+            item_id = str(item.get("id", ""))
+            with col:
+                pid   = str(item.get("photo_id", ""))
+                url   = photo_url(pid)
+                title = str(item.get("title", "Unknown"))
+                price = float(item.get("price", 0.0))
 
-            with q_col1:
-                st.markdown('<div class="stepper-minus">', unsafe_allow_html=True)
-                if st.button("−", key=f"minus_{item_id}", use_container_width=True):
-                    new_qty = max(0, current_qty - 1)
-                    st.session_state.quantities[item_id] = new_qty
-                    update_quantity(item_id, new_qty)
-                    st.cache_data.clear()
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+                if url and image_exists(url):
+                    st.image(url, use_container_width=True)
+                else:
+                    st.markdown(PLACEHOLDER, unsafe_allow_html=True)
 
-            with q_col2:
                 st.markdown(
-                    f"<div style='text-align:center; font-size:1rem; font-weight:600; "
-                    f"color:#ffffff; padding-top:4px;'>{current_qty}</div>",
+                    f"<div style='color:#aaaacc; font-size:0.72rem; margin-top:0.3rem; "
+                    f"overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' "
+                    f"title='{title}'>{title}</div>"
+                    f"<div style='color:#ffffff; font-size:0.85rem; font-weight:600; "
+                    f"margin-top:0.1rem;'>${price:.2f}</div>",
                     unsafe_allow_html=True
                 )
 
-            with q_col3:
-                st.markdown('<div class="stepper-plus">', unsafe_allow_html=True)
-                if st.button("+", key=f"plus_{item_id}", use_container_width=True):
-                    new_qty = current_qty + 1
-                    st.session_state.quantities[item_id] = new_qty
-                    update_quantity(item_id, new_qty)
-                    st.cache_data.clear()
-                    st.rerun()
-                st.markdown('</div>', unsafe_allow_html=True)
+                current_qty = st.session_state.quantities.get(item_id, 0)
+                q_col1, q_col2, q_col3 = st.columns([1, 1, 1])
 
-st.divider()
+                with q_col1:
+                    if st.button("−", key=f"minus_{item_id}", use_container_width=True):
+                        new_qty = max(0, current_qty - 1)
+                        st.session_state.quantities[item_id] = new_qty
+                        update_quantity(item_id, new_qty)
+                        st.cache_data.clear()
+                        st.rerun()
 
-# ---- FILTERS ---------------------------------------------------- #
+                with q_col2:
+                    st.markdown(
+                        f"<div style='text-align:center; font-size:1rem; font-weight:600; "
+                        f"color:#ffffff; padding-top:4px;'>{current_qty}</div>",
+                        unsafe_allow_html=True
+                    )
 
-with st.expander("🔍  Filter & Search", expanded=False):
-    search = st.text_input("", placeholder="Search by title, SKU, or eBay category...")
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        min_price = st.number_input("Min price ($)", value=0.0, step=1.0)
-    with col_p2:
-        price_max_default = float(df["price"].max()) if "price" in df.columns and df["price"].max() > 0 else 9999.0
-        max_price = st.number_input("Max price ($)", value=price_max_default, step=1.0)
+                with q_col3:
+                    if st.button("+", key=f"plus_{item_id}", use_container_width=True):
+                        new_qty = current_qty + 1
+                        st.session_state.quantities[item_id] = new_qty
+                        update_quantity(item_id, new_qty)
+                        st.cache_data.clear()
+                        st.rerun()
 
-filtered = df.copy()
-if search:
-    mask = (
-        filtered.get("title", pd.Series()).astype(str).str.contains(search, case=False, na=False) |
-        filtered.get("photo_id", pd.Series()).astype(str).str.contains(search, case=False, na=False) |
-        filtered.get("ebay_category", pd.Series()).astype(str).str.contains(search, case=False, na=False)
+    st.divider()
+
+    # ---- FILTERS ---------------------------------------------------- #
+
+    with st.expander("🔍  Filter & Search", expanded=False):
+        search = st.text_input("Search", placeholder="Search by title, SKU, or eBay category...", label_visibility="collapsed")
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            min_price = st.number_input("Min price ($)", value=0.0, step=1.0)
+        with col_p2:
+            price_max_default = float(df["price"].max()) if "price" in df.columns and df["price"].max() > 0 else 9999.0
+            max_price = st.number_input("Max price ($)", value=price_max_default, step=1.0)
+
+    filtered = df.copy()
+    if search:
+        mask = (
+            filtered.get("title", pd.Series()).astype(str).str.contains(search, case=False, na=False) |
+            filtered.get("photo_id", pd.Series()).astype(str).str.contains(search, case=False, na=False) |
+            filtered.get("ebay_category", pd.Series()).astype(str).str.contains(search, case=False, na=False)
+        )
+        filtered = filtered[mask]
+    if "price" in filtered.columns:
+        filtered = filtered[(filtered["price"] >= min_price) & (filtered["price"] <= max_price)]
+
+    st.markdown(
+        f"<p style='color:#6b6b7b; font-size:0.8rem; margin-bottom:0.5rem;'>"
+        f"Showing {len(filtered)} of {total_items} items</p>",
+        unsafe_allow_html=True
     )
-    filtered = filtered[mask]
-if "price" in filtered.columns:
-    filtered = filtered[(filtered["price"] >= min_price) & (filtered["price"] <= max_price)]
 
-st.markdown(
-    f"<p style='color:#6b6b7b; font-size:0.8rem; margin-bottom:0.5rem;'>"
-    f"Showing {len(filtered)} of {total_items} items</p>",
-    unsafe_allow_html=True
-)
+    # ---- TABLE ------------------------------------------------------ #
 
-# ---- TABLE ------------------------------------------------------ #
+    display_cols = {
+        "photo_id":         st.column_config.TextColumn("SKU", width="small"),
+        "title":            st.column_config.TextColumn("Title", width="large"),
+        "ebay_category":    st.column_config.TextColumn("eBay Category", width="large"),
+        "ebay_category_id": st.column_config.NumberColumn("Cat. ID", format="%d", width="small"),
+        "weight_oz":        st.column_config.NumberColumn("oz", format="%.1f", width="small"),
+        "weight_lb":        st.column_config.NumberColumn("lb", format="%.2f", width="small"),
+        "price_range":      st.column_config.TextColumn("Price Range", width="medium"),
+        "price":            st.column_config.NumberColumn("List Price", format="$%.2f", width="small"),
+        "quantity":         st.column_config.NumberColumn("Qty", format="%d", width="small"),
+        "status":           st.column_config.TextColumn("Status", width="small"),
+        "created_at":       st.column_config.DatetimeColumn("Scanned", format="MMM D h:mm a", width="medium"),
+    }
 
-display_cols = {
-    "photo_id":         st.column_config.TextColumn("SKU", width="small"),
-    "title":            st.column_config.TextColumn("Title", width="large"),
-    "ebay_category":    st.column_config.TextColumn("eBay Category", width="large"),
-    "ebay_category_id": st.column_config.NumberColumn("Cat. ID", format="%d", width="small"),
-    "weight_oz":        st.column_config.NumberColumn("oz", format="%.1f", width="small"),
-    "weight_lb":        st.column_config.NumberColumn("lb", format="%.2f", width="small"),
-    "price_range":      st.column_config.TextColumn("Price Range", width="medium"),
-    "price":            st.column_config.NumberColumn("List Price", format="$%.2f", width="small"),
-    "quantity":         st.column_config.NumberColumn("Qty", format="%d", width="small"),
-    "status":           st.column_config.TextColumn("Status", width="small"),
-    "created_at":       st.column_config.DatetimeColumn("Scanned", format="MMM D h:mm a", width="medium"),
-}
+    visible     = {k: v for k, v in display_cols.items() if k in filtered.columns}
+    always_hide = {"id", "price_low", "price_high", "description"}
+    hidden      = [c for c in filtered.columns if c not in visible and c not in always_hide]
 
-visible     = {k: v for k, v in display_cols.items() if k in filtered.columns}
-always_hide = {"id", "price_low", "price_high", "description"}
-hidden      = [c for c in filtered.columns if c not in visible and c not in always_hide]
-
-st.dataframe(
-    filtered,
-    use_container_width=True,
-    hide_index=True,
-    column_config={
-        **visible,
-        **{c: None for c in always_hide},
-        **{c: None for c in hidden},
-    },
-)
-
-st.divider()
-
-# ---- ACTIONS ---------------------------------------------------- #
-
-col_export, col_ebay, col_clear = st.columns([2, 2, 1])
-
-with col_export:
-    csv_df = filtered.copy()
-    if "created_at" in csv_df.columns:
-        csv_df["created_at"] = csv_df["created_at"].astype(str)
-    csv_bytes = csv_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="⬇️  Export raw data CSV",
-        data=csv_bytes,
-        file_name="mantle_inventory.csv",
-        mime="text/csv",
+    st.dataframe(
+        filtered,
         use_container_width=True,
+        hide_index=True,
+        column_config={
+            **visible,
+            **{c: None for c in always_hide},
+            **{c: None for c in hidden},
+        },
     )
 
-with col_ebay:
-    ebay_bytes = build_ebay_csv(filtered)
-    st.download_button(
-        label="🛒  Export to eBay draft CSV",
-        data=ebay_bytes,
-        file_name=f"mantle_ebay_drafts_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-        mime="text/csv",
-        use_container_width=True,
-    )
+    st.divider()
 
-with col_clear:
-    if "confirm_clear" not in st.session_state:
-        st.session_state.confirm_clear = False
+    # ---- ACTIONS ---------------------------------------------------- #
 
-    if not st.session_state.confirm_clear:
-        if st.button("🗑️  Clear Batch", use_container_width=True, type="secondary"):
-            st.session_state.confirm_clear = True
-            st.rerun()
-    else:
-        st.warning(f"Archive all **{total_items}** items and clear this batch?")
-        y, n = st.columns(2)
-        with y:
-            if st.button("✅  Confirm", use_container_width=True, type="primary"):
-                try:
-                    append_to_archive(df)
-                    all_ids = df["id"].dropna().astype(str).tolist() if "id" in df.columns else []
-                    if all_ids:
-                        supabase.table("listings").update(
-                            {"status": "archived"}
-                        ).in_("id", all_ids).execute()
+    col_export, col_ebay, col_clear = st.columns([2, 2, 1])
+
+    with col_export:
+        csv_df = filtered.copy()
+        if "created_at" in csv_df.columns:
+            csv_df["created_at"] = csv_df["created_at"].astype(str)
+        csv_bytes = csv_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️  Export raw data CSV",
+            data=csv_bytes,
+            file_name="mantle_inventory.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    with col_ebay:
+        ebay_bytes = build_ebay_csv(filtered)
+        st.download_button(
+            label="🛒  Export to eBay draft CSV",
+            data=ebay_bytes,
+            file_name=f"mantle_ebay_drafts_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+
+    with col_clear:
+        if "confirm_clear" not in st.session_state:
+            st.session_state.confirm_clear = False
+
+        if not st.session_state.confirm_clear:
+            if st.button("🗑️  Clear Batch", use_container_width=True, type="secondary"):
+                st.session_state.confirm_clear = True
+                st.rerun()
+        else:
+            st.warning(f"Archive all **{total_items}** items and clear this batch?")
+            y, n = st.columns(2)
+            with y:
+                if st.button("✅  Confirm", use_container_width=True, type="primary"):
+                    try:
+                        append_to_archive(df)
+                        all_ids = df["id"].dropna().astype(str).tolist() if "id" in df.columns else []
+                        if all_ids:
+                            supabase.table("listings").update(
+                                {"status": "archived"}
+                            ).in_("id", all_ids).execute()
+                        st.session_state.confirm_clear = False
+                        st.session_state.quantities    = {}
+                        st.cache_data.clear()
+                        st.success(f"✅  {total_items} items archived.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed: {e}")
+                        st.session_state.confirm_clear = False
+            with n:
+                if st.button("✗  Cancel", use_container_width=True):
                     st.session_state.confirm_clear = False
-                    st.session_state.quantities    = {}
+                    st.rerun()
+
+st.divider()
+
+# ------------------------------------------------------------------ #
+#  ISSUES SECTION
+# ------------------------------------------------------------------ #
+
+st.markdown("""
+<p style='color:#6b6b7b; font-size:0.75rem; text-transform:uppercase;
+letter-spacing:0.08em; font-weight:500; margin-bottom:1rem;'>Submitted Issues</p>
+""", unsafe_allow_html=True)
+
+issues_df = fetch_issues()
+
+if issues_df.empty:
+    st.markdown(
+        "<p style='color:#6b6b7b; font-size:0.85rem;'>No issues submitted yet.</p>",
+        unsafe_allow_html=True
+    )
+else:
+    for _, issue in issues_df.iterrows():
+        issue_id  = str(issue.get("id", ""))
+        desc      = str(issue.get("description", ""))
+        submitted = issue.get("submitted_at", "")
+        if hasattr(submitted, "strftime"):
+            submitted = submitted.strftime("%b %d, %Y %I:%M %p")
+
+        with st.container():
+            st.markdown(f"""
+            <div style='background:#1a1a1f; border:1px solid #2a2a32; border-radius:10px;
+            padding:1rem 1.2rem; margin-bottom:0.75rem;'>
+                <div style='color:#6b6b7b; font-size:0.72rem; margin-bottom:0.4rem;'>{submitted}</div>
+                <div style='color:#ffffff; font-size:0.9rem;'>{desc}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if st.button("✓ Mark resolved", key=f"resolve_{issue_id}"):
+                try:
+                    supabase.table("issues").delete().eq("id", issue_id).execute()
                     st.cache_data.clear()
-                    st.success(f"✅  {total_items} items archived.")
                     st.rerun()
                 except Exception as e:
                     st.error(f"Failed: {e}")
-                    st.session_state.confirm_clear = False
-        with n:
-            if st.button("✗  Cancel", use_container_width=True):
-                st.session_state.confirm_clear = False
-                st.rerun()
+
+st.divider()
+
+# ------------------------------------------------------------------ #
+#  SUBMIT ISSUE FROM DASHBOARD
+# ------------------------------------------------------------------ #
+
+with st.expander("➕  Submit an issue", expanded=False):
+    issue_text = st.text_area("Description", placeholder="Describe the issue...", label_visibility="collapsed")
+    if st.button("Submit Issue", type="primary"):
+        if issue_text.strip():
+            now = datetime.now().isoformat()
+            supabase.table("issues").insert({
+                "description":  issue_text.strip(),
+                "submitted_at": now,
+            }).execute()
+            send_issue_email(issue_text.strip(), now)
+            st.cache_data.clear()
+            st.success("✅ Issue submitted and email sent.")
+            st.rerun()
+        else:
+            st.warning("Please enter a description before submitting.")
