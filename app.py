@@ -15,7 +15,7 @@ load_dotenv()
 # ------------------------------------------------------------------ #
 
 st.set_page_config(
-    page_title="Mantle Inventory",
+    page_title="Lister AI",
     page_icon="📦",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -107,9 +107,9 @@ st.markdown("""
 def get_supabase() -> Client:
     return create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
-supabase     = get_supabase()
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "re_BoUo8RP6_JcZcx4yCpNHFxENw45K5tvzg")
+supabase       = get_supabase()
+SUPABASE_URL   = os.getenv("SUPABASE_URL")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 NOTIFY_EMAIL   = "sebastian@lilbeecreative.com"
 
 ARCHIVE_FILE    = "mantle_archive.csv"
@@ -131,7 +131,8 @@ EBAY_COLUMNS = [
 # ------------------------------------------------------------------ #
 
 def send_issue_email(description: str, submitted_at: str):
-    """Send email notification via Resend when a new issue is submitted."""
+    if not RESEND_API_KEY:
+        return
     try:
         requests.post(
             "https://api.resend.com/emails",
@@ -140,9 +141,9 @@ def send_issue_email(description: str, submitted_at: str):
                 "Content-Type": "application/json",
             },
             json={
-                "from":    "Mantle Scanner <onboarding@resend.dev>",
+                "from":    "Lister AI <onboarding@resend.dev>",
                 "to":      [NOTIFY_EMAIL],
-                "subject": "New Issue Submitted — Mantle Scanner",
+                "subject": "New Issue Submitted — Lister AI",
                 "html":    f"""
                     <h2>New Issue Submitted</h2>
                     <p><strong>Submitted at:</strong> {submitted_at}</p>
@@ -175,19 +176,20 @@ def append_to_archive(df: pd.DataFrame):
             writer.writerow(record)
 
 def photo_url(photo_id: str) -> str:
-    if not photo_id or photo_id in ("0", ""):
+    if not photo_id or str(photo_id) in ("0", "", "nan"):
         return ""
     return f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
 
 @st.cache_data(ttl=300)
 def image_exists(url: str) -> bool:
+    """Check if image URL is reachable — assumes True on timeout so image still attempts to load."""
     if not url:
         return False
     try:
-        r = requests.head(url, timeout=4)
-        return r.status_code == 200
+        r = requests.head(url, timeout=8)
+        return r.status_code in (200, 301, 302)
     except Exception:
-        return False
+        return True  # let st.image try and handle failure gracefully
 
 def update_quantity(item_id: str, qty: int):
     try:
@@ -298,7 +300,7 @@ if df.empty:
     </div>
     """, unsafe_allow_html=True)
 else:
-    # ---- METRICS ---------------------------------------------------- #
+    # ---- METRICS ------------------------------------------------- #
 
     total_items = len(df)
     total_value = df["price"].sum() if "price" in df.columns else 0
@@ -309,7 +311,7 @@ else:
 
     st.divider()
 
-    # ---- PHOTO GALLERY WITH QUANTITY STEPPERS ----------------------- #
+    # ---- GALLERY ------------------------------------------------- #
 
     st.markdown(
         "<p style='color:#6b6b7b; font-size:0.75rem; text-transform:uppercase; "
@@ -348,7 +350,10 @@ else:
                 price = float(item.get("price", 0.0))
 
                 if url and image_exists(url):
-                    st.image(url, use_container_width=True)
+                    try:
+                        st.image(url, use_container_width=True)
+                    except Exception:
+                        st.markdown(PLACEHOLDER, unsafe_allow_html=True)
                 else:
                     st.markdown(PLACEHOLDER, unsafe_allow_html=True)
 
@@ -362,9 +367,9 @@ else:
                 )
 
                 current_qty = st.session_state.quantities.get(item_id, 0)
-                q_col1, q_col2, q_col3 = st.columns([1, 1, 1])
+                q1, q2, q3 = st.columns([1, 1, 1])
 
-                with q_col1:
+                with q1:
                     if st.button("−", key=f"minus_{item_id}", use_container_width=True):
                         new_qty = max(0, current_qty - 1)
                         st.session_state.quantities[item_id] = new_qty
@@ -372,14 +377,14 @@ else:
                         st.cache_data.clear()
                         st.rerun()
 
-                with q_col2:
+                with q2:
                     st.markdown(
                         f"<div style='text-align:center; font-size:1rem; font-weight:600; "
                         f"color:#ffffff; padding-top:4px;'>{current_qty}</div>",
                         unsafe_allow_html=True
                     )
 
-                with q_col3:
+                with q3:
                     if st.button("+", key=f"plus_{item_id}", use_container_width=True):
                         new_qty = current_qty + 1
                         st.session_state.quantities[item_id] = new_qty
@@ -389,7 +394,7 @@ else:
 
     st.divider()
 
-    # ---- FILTERS ---------------------------------------------------- #
+    # ---- FILTERS ------------------------------------------------- #
 
     with st.expander("🔍  Filter & Search", expanded=False):
         search = st.text_input("Search", placeholder="Search by title, SKU, or eBay category...", label_visibility="collapsed")
@@ -417,7 +422,7 @@ else:
         unsafe_allow_html=True
     )
 
-    # ---- TABLE ------------------------------------------------------ #
+    # ---- TABLE --------------------------------------------------- #
 
     display_cols = {
         "photo_id":         st.column_config.TextColumn("SKU", width="small"),
@@ -450,7 +455,7 @@ else:
 
     st.divider()
 
-    # ---- ACTIONS ---------------------------------------------------- #
+    # ---- ACTIONS ------------------------------------------------- #
 
     col_export, col_ebay, col_clear = st.columns([2, 2, 1])
 
@@ -462,7 +467,7 @@ else:
         st.download_button(
             label="⬇️  Export raw data CSV",
             data=csv_bytes,
-            file_name="mantle_inventory.csv",
+            file_name="listerai_inventory.csv",
             mime="text/csv",
             use_container_width=True,
         )
@@ -472,7 +477,7 @@ else:
         st.download_button(
             label="🛒  Export to eBay draft CSV",
             data=ebay_bytes,
-            file_name=f"mantle_ebay_drafts_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            file_name=f"listerai_ebay_drafts_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
             mime="text/csv",
             use_container_width=True,
         )
@@ -513,7 +518,7 @@ else:
 st.divider()
 
 # ------------------------------------------------------------------ #
-#  ISSUES SECTION
+#  ISSUES
 # ------------------------------------------------------------------ #
 
 st.markdown("""
@@ -536,27 +541,26 @@ else:
         if hasattr(submitted, "strftime"):
             submitted = submitted.strftime("%b %d, %Y %I:%M %p")
 
-        with st.container():
-            st.markdown(f"""
-            <div style='background:#1a1a1f; border:1px solid #2a2a32; border-radius:10px;
-            padding:1rem 1.2rem; margin-bottom:0.75rem;'>
-                <div style='color:#6b6b7b; font-size:0.72rem; margin-bottom:0.4rem;'>{submitted}</div>
-                <div style='color:#ffffff; font-size:0.9rem;'>{desc}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style='background:#1a1a1f; border:1px solid #2a2a32; border-radius:10px;
+        padding:1rem 1.2rem; margin-bottom:0.75rem;'>
+            <div style='color:#6b6b7b; font-size:0.72rem; margin-bottom:0.4rem;'>{submitted}</div>
+            <div style='color:#ffffff; font-size:0.9rem;'>{desc}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-            if st.button("✓ Mark resolved", key=f"resolve_{issue_id}"):
-                try:
-                    supabase.table("issues").delete().eq("id", issue_id).execute()
-                    st.cache_data.clear()
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Failed: {e}")
+        if st.button("✓ Mark resolved", key=f"resolve_{issue_id}"):
+            try:
+                supabase.table("issues").delete().eq("id", issue_id).execute()
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed: {e}")
 
 st.divider()
 
 # ------------------------------------------------------------------ #
-#  SUBMIT ISSUE FROM DASHBOARD
+#  SUBMIT ISSUE
 # ------------------------------------------------------------------ #
 
 with st.expander("➕  Submit an issue", expanded=False):
