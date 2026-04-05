@@ -119,13 +119,6 @@ ARCHIVE_HEADERS = [
     "price", "quantity", "status", "created_at"
 ]
 
-EBAY_HEADER  = "Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)"
-EBAY_COLUMNS = [
-    EBAY_HEADER, "Custom label (SKU)", "Category ID", "Title",
-    "UPC", "Price", "Quantity", "Item photo URL",
-    "Condition ID", "Description", "Format",
-]
-
 # ------------------------------------------------------------------ #
 #  EMAIL
 # ------------------------------------------------------------------ #
@@ -182,14 +175,13 @@ def photo_url(photo_id: str) -> str:
 
 @st.cache_data(ttl=300)
 def image_exists(url: str) -> bool:
-    """Check if image URL is reachable — assumes True on timeout so image still attempts to load."""
     if not url:
         return False
     try:
         r = requests.head(url, timeout=8)
         return r.status_code in (200, 301, 302)
     except Exception:
-        return True  # let st.image try and handle failure gracefully
+        return True
 
 def update_quantity(item_id: str, qty: int):
     try:
@@ -198,13 +190,23 @@ def update_quantity(item_id: str, qty: int):
         st.error(f"Failed to update quantity: {e}")
 
 def build_ebay_csv(df: pd.DataFrame) -> bytes:
+    """
+    Builds eBay bulk upload CSV matching the exact template format.
+    INFO rows use trailing commas to match the 11-column structure.
+    """
     output = io.StringIO()
+
+    # eBay requires these exact INFO rows with correct column padding
+    output.write('#INFO,Version=0.0.2,Template= eBay-draft-listings-template_US,,,,,,,,\n')
+    output.write('#INFO Action and Category ID are required fields. 1) Set Action to Draft 2) Please find the category ID for your listings here: https://pages.ebay.com/sellerinformation/news/categorychanges.html,,,,,,,,,,\n')
+    output.write('#INFO After you\'ve successfully uploaded your draft from the Seller Hub Reports tab, complete your drafts to active listings here: https://www.ebay.com/sh/lst/drafts,,,,,,,,,,\n')
+    output.write('#INFO,,,,,,,,,,\n')
+
+    # Column headers
+    output.write('Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8),Custom label (SKU),Category ID,Title,UPC,Price,Quantity,Item photo URL,Condition ID,Description,Format\n')
+
+    # Data rows
     writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
-    writer.writerow(["#INFO,Version=0.0.2,Template= eBay-draft-listings-template_US"])
-    writer.writerow(["#INFO Action and Category ID are required fields."])
-    writer.writerow(["#INFO After you've successfully uploaded your draft from the Seller Hub Reports tab, complete your drafts here: https://www.ebay.com/sh/lst/drafts"])
-    writer.writerow(["#INFO"])
-    writer.writerow(EBAY_COLUMNS)
     for _, row in df.iterrows():
         sku         = str(row.get("photo_id", "")).rsplit(".", 1)[0]
         category_id = str(int(row.get("ebay_category_id", 0))) if row.get("ebay_category_id") else ""
@@ -212,7 +214,11 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
         price       = f"{float(row.get('price', 0)):.2f}"
         quantity    = str(int(row.get("quantity", 0)))
         pic_url     = photo_url(str(row.get("photo_id", "")))
-        writer.writerow(["Draft", sku, category_id, title, "", price, quantity, pic_url, "1000", "", "FixedPrice"])
+        writer.writerow([
+            "Draft", sku, category_id, title, "",
+            price, quantity, pic_url, "1000", "", "FixedPrice"
+        ])
+
     return output.getvalue().encode("utf-8")
 
 # ------------------------------------------------------------------ #
