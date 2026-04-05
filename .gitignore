@@ -1,0 +1,14 @@
+.env
+*.png
+*.jpg
+*.jpeg
+*.heic
+__pycache__/
+temp_barcodes/
+temp_qr/
+labels/
+seen_files.json
+scan_counter.json
+mantle_archive.csv
+venv/
+.DS_Store
