@@ -288,7 +288,7 @@ def process_new_photo(file_info):
 #  WATCHER LOOP
 # ------------------------------------------------------------------ #
 
-print("🕵️  Mantle Patrol ACTIVE... Watching Supabase.")
+print("🕵️  Lister AI ACTIVE... Watching Supabase.")
 seen_files = load_seen()
 
 existing = {f['name'] for f in supabase.storage.from_("part-photos").list()}

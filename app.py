@@ -149,7 +149,7 @@ def send_issue_email(description: str, submitted_at: str):
                     <p><strong>Description:</strong></p>
                     <p>{description}</p>
                     <hr>
-                    <p style="color:#999; font-size:12px;">Mantle Hydraulics — Scanner System</p>
+                    <p style="color:#999; font-size:12px;">Lister AI — Scanner System</p>
                 """,
             }
         )
@@ -267,7 +267,7 @@ def fetch_issues():
 st.markdown("""
 <div style="margin-bottom:0.5rem;">
     <h1 style="margin:0; font-size:1.6rem; font-weight:700; color:#ffffff; letter-spacing:-0.03em;">
-        Mantle Hydraulics
+        Lister AI
     </h1>
     <p style="margin:0; color:#6b6b7b; font-size:0.85rem; margin-top:2px;">
         Current batch — scanned items only
