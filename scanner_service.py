@@ -27,8 +27,7 @@ if not all([url, key, api_key]):
 supabase = create_client(url, key)
 client   = genai.Client(api_key=api_key)
 
-SEEN_FILE    = "seen_files.json"
-COUNTER_FILE = "scan_counter.json"
+SEEN_FILE = "seen_files.json"
 
 def load_seen():
     if os.path.exists(SEEN_FILE):
@@ -42,19 +41,6 @@ def load_seen():
 def save_seen(seen):
     with open(SEEN_FILE, "w") as f:
         json.dump(list(seen), f)
-
-def load_counter() -> int:
-    if os.path.exists(COUNTER_FILE):
-        try:
-            with open(COUNTER_FILE, "r") as f:
-                return json.load(f).get("count", 1)
-        except Exception:
-            return 1
-    return 1
-
-def save_counter(count: int):
-    with open(COUNTER_FILE, "w") as f:
-        json.dump({"count": count}, f)
 
 # ------------------------------------------------------------------ #
 #  MODEL PICKER
@@ -78,8 +64,7 @@ def resolve_model():
     print(f"✅ Using fallback: {fallback}")
     return fallback
 
-model   = resolve_model()
-counter = load_counter()
+model = resolve_model()
 
 # ------------------------------------------------------------------ #
 #  EXIF DATE EXTRACTION
@@ -108,16 +93,20 @@ def get_exif_date(raw_bytes: bytes):
     return dt, dt.isoformat()
 
 # ------------------------------------------------------------------ #
-#  FILE RENAMING — DDMMYY_NNN format
+#  FILE RENAMING — DDMMYY_HHMMSS format (always unique)
 # ------------------------------------------------------------------ #
 
-def build_new_filename(dt: datetime, count: int, original_name: str) -> str:
-    date_code = dt.strftime("%d%m%y")
-    serial    = str(count).zfill(3)
-    ext       = os.path.splitext(original_name)[1].lower()
+def build_new_filename(dt: datetime, original_name: str) -> str:
+    """
+    Uses date from EXIF + current time for uniqueness.
+    Format: DDMMYY_HHMMSS.jpg e.g. 050426_064745.jpg
+    """
+    date_code  = dt.strftime("%d%m%y")
+    time_code  = datetime.now().strftime("%H%M%S")
+    ext        = os.path.splitext(original_name)[1].lower()
     if ext not in (".jpg", ".jpeg", ".png", ".heic"):
         ext = ".jpg"
-    return f"{date_code}_{serial}{ext}"
+    return f"{date_code}_{time_code}{ext}"
 
 def rename_in_supabase(raw_bytes: bytes, old_name: str, new_name: str) -> bool:
     try:
@@ -151,31 +140,22 @@ def to_jpeg_bytes(raw_bytes: bytes) -> bytes:
     return buf.getvalue()
 
 # ------------------------------------------------------------------ #
-#  GEMINI PROMPT — no description field
+#  GEMINI PROMPT
 # ------------------------------------------------------------------ #
 
 PROMPT = """You are a JSON-only industrial parts identifier and resale pricing expert.
 
-Step 1 — Look at this image and identify the part. Read any visible text, part numbers, or brand markings.
+Step 1 — Look at this image and identify the item. Read any visible text, part numbers, or brand markings.
 
 Step 2 — Search Google and eBay to find:
 - The correct eBay category NAME and its numeric CATEGORY ID
 - Realistic resale price range from recent eBay SOLD listings
 - Estimated shipping weight
 
-To find the eBay category ID, search for the item on eBay and look at what numeric category ID it falls under.
-For industrial/hydraulic parts, common IDs include:
-- Hydraulic Pumps: 26241
-- Hydraulic Cylinders: 26244
-- Hydraulic Valves: 26246
-- Industrial Automation: 32834
-- Pneumatic tools: 25999
-- Power tools: 631
-
 Return ONLY a raw JSON object, no markdown, no backticks, nothing else:
 
 {
-  "title": "short descriptive part title under 80 characters optimized for eBay search",
+  "title": "short descriptive title under 80 characters optimized for eBay search",
   "ebay_category": "full eBay category name path",
   "ebay_category_id": "numeric eBay category ID only, no text",
   "weight_oz": "estimated weight in ounces as a number only",
@@ -185,7 +165,7 @@ Return ONLY a raw JSON object, no markdown, no backticks, nothing else:
   "price": "suggested listing price as a number only, no dollar sign"
 }
 
-If you cannot identify the part, use "Unknown Industrial Part" for title, "26241" for ebay_category_id, and "0" for all numeric fields.
+If you cannot identify the item, use "Unknown Item" for title, "0" for ebay_category_id, and "0" for all numeric fields.
 Never return placeholder text. Always search before answering."""
 
 
@@ -208,27 +188,29 @@ def parse_int(val):
 # ------------------------------------------------------------------ #
 
 def process_new_photo(file_info):
-    global counter
-
     old_name = file_info['name']
     print(f"📸 New Scan Detected: {old_name}")
 
     try:
         raw_bytes = supabase.storage.from_("part-photos").download(old_name)
 
+        # Extract EXIF before conversion strips it
         dt, scanned_at = get_exif_date(raw_bytes)
 
-        new_name = build_new_filename(dt, counter, old_name)
+        # Build unique filename
+        new_name = build_new_filename(dt, old_name)
 
         print("🔄 Converting image to JPEG...")
         jpeg_bytes = to_jpeg_bytes(raw_bytes)
 
+        # Rename in Supabase
         renamed  = rename_in_supabase(jpeg_bytes, old_name, new_name)
         photo_id = new_name if renamed else old_name
 
+        # Analyze with Gemini
         image_part = types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg")
 
-        print("🤖 Analyzing part with AI + Google Search...")
+        print("🤖 Analyzing with AI + Google Search...")
         response = client.models.generate_content(
             model=model,
             contents=[image_part, PROMPT],
@@ -243,7 +225,7 @@ def process_new_photo(file_info):
 
         try:
             data             = json.loads(raw)
-            title            = str(data.get("title", "Unknown Industrial Part")).strip()[:80]
+            title            = str(data.get("title", "Unknown Item")).strip()[:80]
             ebay_category    = str(data.get("ebay_category", "")).strip()
             ebay_category_id = parse_int(data.get("ebay_category_id", 0))
             weight_oz        = parse_num(data.get("weight_oz", 0))
@@ -253,7 +235,7 @@ def process_new_photo(file_info):
             price            = parse_num(data.get("price", 0))
         except json.JSONDecodeError:
             print(f"⚠️  JSON parse failed — raw: {raw[:80]}")
-            title, ebay_category = "Unknown Industrial Part", ""
+            title, ebay_category = "Unknown Item", ""
             ebay_category_id = 0
             weight_oz = weight_lb = price_low = price_high = price = 0.00
 
@@ -270,9 +252,6 @@ def process_new_photo(file_info):
             "status":           "scanned",
             "created_at":       scanned_at,
         }).execute()
-
-        counter += 1
-        save_counter(counter)
 
         print(f"✅ {title}")
         print(f"   SKU      : {photo_id}")
@@ -304,7 +283,6 @@ while True:
             if f['name'] not in seen_files:
                 process_new_photo(f)
                 seen_files.add(f['name'])
-                seen_files.add(build_new_filename(datetime.now(), counter - 1, f['name']))
                 save_seen(seen_files)
     except Exception as e:
         print(f"⚠️  Connection hiccup: {e}")
