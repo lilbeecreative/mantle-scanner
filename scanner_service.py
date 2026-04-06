@@ -27,20 +27,26 @@ if not all([url, key, api_key]):
 supabase = create_client(url, key)
 client   = genai.Client(api_key=api_key)
 
-SEEN_FILE = "seen_files.json"
+# ------------------------------------------------------------------ #
+#  SEEN FILES — stored in Supabase, persists across Railway restarts
+# ------------------------------------------------------------------ #
 
-def load_seen():
-    if os.path.exists(SEEN_FILE):
-        try:
-            with open(SEEN_FILE, "r") as f:
-                return set(json.load(f))
-        except Exception:
-            return set()
-    return set()
+def load_seen() -> set:
+    try:
+        result = supabase.table("seen_files").select("filename").execute()
+        return {row["filename"] for row in (result.data or [])}
+    except Exception as e:
+        print(f"⚠️  Could not load seen_files from Supabase: {e}")
+        return set()
 
-def save_seen(seen):
-    with open(SEEN_FILE, "w") as f:
-        json.dump(list(seen), f)
+def mark_seen(filename: str):
+    try:
+        supabase.table("seen_files").upsert(
+            {"filename": filename},
+            on_conflict="filename"
+        ).execute()
+    except Exception as e:
+        print(f"⚠️  Could not mark {filename} as seen: {e}")
 
 # ------------------------------------------------------------------ #
 #  MODEL PICKER
@@ -145,7 +151,7 @@ def parse_int(val):
         return 0
 
 # ------------------------------------------------------------------ #
-#  GEMINI PROMPT — fetches both new and used prices in one call
+#  GEMINI PROMPT
 # ------------------------------------------------------------------ #
 
 def make_prompt(photo_count: int, condition: str = "used") -> str:
@@ -240,6 +246,11 @@ def process_group(group: dict):
             image_parts.append(
                 types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg")
             )
+
+            # Mark both old and new names as seen
+            mark_seen(old_name)
+            mark_seen(final_name)
+
             time.sleep(1)
 
         except Exception as e:
@@ -251,7 +262,7 @@ def process_group(group: dict):
         return
 
     prompt = make_prompt(len(image_parts), condition)
-    print(f"   🤖 Sending {len(image_parts)} photos to Gemini (fetching both new + used prices)...")
+    print(f"   🤖 Sending {len(image_parts)} photos to Gemini...")
 
     try:
         response = client.models.generate_content(
@@ -269,10 +280,9 @@ def process_group(group: dict):
         data             = json.loads(raw)
         title            = str(data.get("title", "Unknown Item")).strip()[:80]
         ebay_category    = str(data.get("ebay_category", "")).strip()
-        ebay_category_id = parse_int(data.get("ebay_category_id", 0))
+        ebay_category_id = str(parse_int(data.get("ebay_category_id", 0)))
         weight_oz        = parse_num(data.get("weight_oz", 0))
         weight_lb        = parse_num(data.get("weight_lb", 0))
-
         price_used_low   = parse_num(data.get("price_used_low", 0))
         price_used_high  = parse_num(data.get("price_used_high", 0))
         price_used       = parse_num(data.get("price_used", 0))
@@ -280,22 +290,21 @@ def process_group(group: dict):
         price_new_high   = parse_num(data.get("price_new_high", 0))
         price_new        = parse_num(data.get("price_new", 0))
 
-        # Active price based on condition — fall back to other if missing
         if condition == "used":
-            active_price    = price_used if price_used > 0 else price_new
-            active_low      = price_used_low if price_used_low > 0 else price_new_low
-            active_high     = price_used_high if price_used_high > 0 else price_new_high
-            price_note      = "new" if price_used == 0 and price_new > 0 else ""
+            active_price = price_used if price_used > 0 else price_new
+            active_low   = price_used_low if price_used_low > 0 else price_new_low
+            active_high  = price_used_high if price_used_high > 0 else price_new_high
+            price_note   = "new" if price_used == 0 and price_new > 0 else ""
         else:
-            active_price    = price_new if price_new > 0 else price_used
-            active_low      = price_new_low if price_new_low > 0 else price_used_low
-            active_high     = price_new_high if price_new_high > 0 else price_used_high
-            price_note      = "used" if price_new == 0 and price_used > 0 else ""
+            active_price = price_new if price_new > 0 else price_used
+            active_low   = price_new_low if price_new_low > 0 else price_used_low
+            active_high  = price_new_high if price_new_high > 0 else price_used_high
+            price_note   = "used" if price_new == 0 and price_used > 0 else ""
 
     except Exception as e:
         print(f"   ⚠️  Gemini error: {e}")
         title, ebay_category, price_note = "Unknown Item", "", ""
-        ebay_category_id = 0
+        ebay_category_id = "0"
         weight_oz = weight_lb = 0.00
         price_used = price_used_low = price_used_high = 0.00
         price_new  = price_new_low  = price_new_high  = 0.00
@@ -325,10 +334,8 @@ def process_group(group: dict):
     print(f"   ✅ {title}")
     print(f"   SKU      : {primary_name}")
     print(f"   Category : {ebay_category} (ID: {ebay_category_id})")
-    print(f"   Condition: {condition}")
-    print(f"   Used     : ${price_used:.2f} (${price_used_low:.2f}–${price_used_high:.2f})")
-    print(f"   New      : ${price_new:.2f} (${price_new_low:.2f}–${price_new_high:.2f})")
-    print(f"   Active   : ${active_price:.2f}{' (note: ' + price_note + ')' if price_note else ''}")
+    print(f"   Used     : ${price_used:.2f} / New: ${price_new:.2f}")
+    print(f"   Active   : ${active_price:.2f}{' (' + price_note + ')' if price_note else ''}")
     print(f"   Quantity : {quantity}")
 
 # ------------------------------------------------------------------ #
@@ -346,8 +353,13 @@ def process_legacy_photo(file_info):
         jpeg_bytes     = to_jpeg_bytes(raw_bytes)
         renamed        = rename_in_supabase(jpeg_bytes, old_name, new_name)
         photo_id       = new_name if renamed else old_name
-        image_part     = types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg")
-        prompt         = make_prompt(1, "used")
+
+        # Mark both as seen immediately
+        mark_seen(old_name)
+        mark_seen(photo_id)
+
+        image_part = types.Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg")
+        prompt     = make_prompt(1, "used")
 
         response = client.models.generate_content(
             model=model,
@@ -364,7 +376,7 @@ def process_legacy_photo(file_info):
         data             = json.loads(raw)
         title            = str(data.get("title", "Unknown Item")).strip()[:80]
         ebay_category    = str(data.get("ebay_category", "")).strip()
-        ebay_category_id = parse_int(data.get("ebay_category_id", 0))
+        ebay_category_id = str(parse_int(data.get("ebay_category_id", 0)))
         weight_oz        = parse_num(data.get("weight_oz", 0))
         weight_lb        = parse_num(data.get("weight_lb", 0))
         price_used       = parse_num(data.get("price_used", 0))
@@ -407,16 +419,28 @@ def process_legacy_photo(file_info):
 # ------------------------------------------------------------------ #
 
 print("🕵️  Lister AI ACTIVE... Watching for groups and photos.")
-seen_files = load_seen()
+print("📋 Loading seen files from Supabase...")
 
-existing = {f['name'] for f in supabase.storage.from_("part-photos").list()}
-if not seen_files:
-    seen_files = existing
-    save_seen(seen_files)
-    print(f"📋 Found {len(seen_files)} existing files — watching for new ones only.")
+seen_files = load_seen()
+print(f"📋 {len(seen_files)} files already seen.")
+
+# Seed seen_files with everything currently in storage on first run
+if len(seen_files) == 0:
+    try:
+        existing = {f['name'] for f in supabase.storage.from_("part-photos").list()}
+        for fname in existing:
+            mark_seen(fname)
+        seen_files = existing
+        print(f"📋 Seeded {len(seen_files)} existing files — watching for new ones only.")
+    except Exception as e:
+        print(f"⚠️  Could not seed existing files: {e}")
 
 while True:
     try:
+        # 1. Reload seen files from Supabase every loop
+        seen_files = load_seen()
+
+        # 2. Check for pending groups
         pending = (
             supabase.table("listing_groups")
             .select("*")
@@ -426,9 +450,11 @@ while True:
         for group in (pending.data or []):
             process_group(group)
 
+        # 3. Check for legacy single photos
         current = supabase.storage.from_("part-photos").list()
         for f in current:
             if f['name'] not in seen_files:
+                # Check if this photo belongs to a group
                 group_check = (
                     supabase.table("group_photos")
                     .select("id")
@@ -437,8 +463,9 @@ while True:
                 )
                 if not group_check.data:
                     process_legacy_photo(f)
-                seen_files.add(f['name'])
-                save_seen(seen_files)
+                else:
+                    # Part of a group — just mark as seen
+                    mark_seen(f['name'])
 
     except Exception as e:
         print(f"⚠️  Connection hiccup: {e}")
