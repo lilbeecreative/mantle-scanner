@@ -80,19 +80,20 @@ st.markdown("""
     }
 
     [data-testid="stTextInput"] input,
-    [data-testid="stNumberInput"] input,
-    [data-testid="stTextArea"] textarea {
+    [data-testid="stNumberInput"] input {
         background: #1a1a1f !important;
         border: 1px solid #2a2a32 !important;
         color: #ffffff !important;
         border-radius: 8px !important;
+        font-size: 0.85rem !important;
     }
 
-    [data-testid="stSelectbox"] > div {
+    [data-testid="stSelectbox"] > div > div {
         background: #1a1a1f !important;
         border: 1px solid #2a2a32 !important;
         color: #ffffff !important;
         border-radius: 8px !important;
+        font-size: 0.85rem !important;
     }
 
     [data-testid="stAlert"] {
@@ -107,6 +108,26 @@ st.markdown("""
         border: 1px solid #2a2a32 !important;
         color: #aaaacc !important;
         border-radius: 8px !important;
+    }
+
+    /* Item card styling */
+    .item-card-container {
+        background: #1a1a1f;
+        border: 1px solid #2a2a32;
+        border-radius: 14px;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    .item-card-container.flagged {
+        border-color: #f59e0b44;
+    }
+    .field-label {
+        color: #6b6b7b;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 2px;
+        font-weight: 500;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -124,7 +145,7 @@ ARCHIVE_FILE    = "mantle_archive.csv"
 ARCHIVE_HEADERS = [
     "batch_cleared_at", "id", "photo_id", "title", "ebay_category",
     "ebay_category_id", "weight_oz", "weight_lb", "price_low", "price_high",
-    "price", "price_note", "quantity", "status", "created_at"
+    "price", "price_note", "condition", "quantity", "status", "created_at"
 ]
 
 # ------------------------------------------------------------------ #
@@ -206,15 +227,13 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
     output.write('Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8),Custom label (SKU),Category ID,Title,UPC,Price,Quantity,Item photo URL,Condition ID,Description,Format\n')
     writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
     for _, row in df.iterrows():
-        sku         = str(row.get("photo_id", "")).rsplit(".", 1)[0]
-        category_id = str(int(row.get("ebay_category_id", 0))) if row.get("ebay_category_id") else ""
-        title       = str(row.get("title", ""))[:80]
-        price       = f"{float(row.get('price', 0)):.2f}"
-        quantity    = str(int(row.get("quantity", 0)))
-        pic_url     = photo_url(str(row.get("photo_id", "")))
-        # Condition: New=1000, Used=3000
-        price_note  = str(row.get("price_note", "")).strip().lower()
-        condition   = str(row.get("condition", "used")).strip().lower()
+        sku            = str(row.get("photo_id", "")).rsplit(".", 1)[0]
+        category_id    = str(int(row.get("ebay_category_id", 0))) if row.get("ebay_category_id") else ""
+        title          = str(row.get("title", ""))[:80]
+        price          = f"{float(row.get('price', 0)):.2f}"
+        quantity       = str(int(row.get("quantity", 0)))
+        pic_url        = photo_url(str(row.get("photo_id", "")))
+        condition      = str(row.get("condition", "used")).strip().lower()
         ebay_condition = "1000" if condition == "new" else "3000"
         writer.writerow([
             "Draft", sku, category_id, title, "",
@@ -326,65 +345,123 @@ else:
 
     st.divider()
 
-    # ---- ITEM CARDS WITH FULL EDITING ---------------------------- #
-
-    st.markdown(
-        "<p style='color:#6b6b7b; font-size:0.75rem; text-transform:uppercase; "
-        "letter-spacing:0.08em; font-weight:500; margin-bottom:1rem;'>Item Gallery</p>",
-        unsafe_allow_html=True
-    )
-
-    PLACEHOLDER = """
-    <div style='background:#1a1a1f; border:1px solid #2a2a32; border-radius:8px;
-    height:140px; display:flex; flex-direction:column; align-items:center;
-    justify-content:center; color:#6b6b7b;'>
-    <div style='font-size:1.8rem;'>📷</div>
-    <div style='font-size:0.7rem; margin-top:4px;'>No image</div>
-    </div>
-    """
+    # ---- UNIFIED ITEM CARDS -------------------------------------- #
 
     if "quantities" not in st.session_state:
         st.session_state.quantities = {}
 
     for _, item in df.iterrows():
-        item_id = str(item.get("id", ""))
+        item_id    = str(item.get("id", ""))
+        pid        = str(item.get("photo_id", ""))
+        title      = str(item.get("title", "Unknown"))
+        price      = float(item.get("price", 0.0))
+        price_note = str(item.get("price_note", "")).strip().lower()
+        condition  = str(item.get("condition", "used")).strip().lower()
+        category   = str(item.get("ebay_category", ""))
+        cat_id     = int(item.get("ebay_category_id", 0) or 0)
+        weight_oz  = float(item.get("weight_oz", 0.0) or 0.0)
+        weight_lb  = float(item.get("weight_lb", 0.0) or 0.0)
+        price_range = str(item.get("price_range", "—"))
+        scanned    = item.get("created_at", "")
+
         if item_id and item_id not in st.session_state.quantities:
             st.session_state.quantities[item_id] = int(item.get("quantity", 0))
 
-    COLS_PER_ROW = 5
-    rows = [df.iloc[i:i+COLS_PER_ROW] for i in range(0, len(df), COLS_PER_ROW)]
+        current_qty = st.session_state.quantities.get(item_id, 0)
+        url         = photo_url(pid)
 
-    for row_df in rows:
-        cols = st.columns(COLS_PER_ROW)
-        for col, (_, item) in zip(cols, row_df.iterrows()):
-            item_id    = str(item.get("id", ""))
-            pid        = str(item.get("photo_id", ""))
-            url        = photo_url(pid)
-            title      = str(item.get("title", "Unknown"))
-            price      = float(item.get("price", 0.0))
-            price_note = str(item.get("price_note", "")).strip().lower()
-            condition  = str(item.get("condition", "used")).strip().lower()
+        # Card border color
+        flag_color = "#f59e0b44" if price_note == "new" else "#2a2a32"
 
-            with col:
-                # Photo
-                if url and image_exists(url):
-                    try:
-                        st.image(url, use_container_width=True)
-                    except Exception:
-                        st.markdown(PLACEHOLDER, unsafe_allow_html=True)
-                else:
-                    st.markdown(PLACEHOLDER, unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='background:#1a1a1f; border:1px solid {flag_color}; "
+            f"border-radius:14px; padding:1rem; margin-bottom:0.75rem;'>",
+            unsafe_allow_html=True
+        )
 
-                # Price display
-                note_html = " <span style='color:#f59e0b; font-size:0.65rem;'>(new)</span>" if price_note == "new" else ""
+        # Two column layout: photo | fields
+        img_col, fields_col = st.columns([1, 3])
+
+        with img_col:
+            if url and image_exists(url):
+                try:
+                    st.image(url, use_container_width=True)
+                except Exception:
+                    st.markdown(
+                        "<div style='background:#0f0f11; border:1px solid #2a2a32; border-radius:8px; "
+                        "height:140px; display:flex; align-items:center; justify-content:center; "
+                        "color:#6b6b7b; font-size:1.5rem;'>📷</div>",
+                        unsafe_allow_html=True
+                    )
+            else:
                 st.markdown(
-                    f"<div style='color:#ffffff; font-size:0.9rem; font-weight:600; margin-top:0.3rem;'>"
-                    f"${price:.2f}{note_html}</div>",
+                    "<div style='background:#0f0f11; border:1px solid #2a2a32; border-radius:8px; "
+                    "height:140px; display:flex; align-items:center; justify-content:center; "
+                    "color:#6b6b7b; font-size:1.5rem;'>📷</div>",
                     unsafe_allow_html=True
                 )
+            # SKU below photo
+            sku_display = pid.rsplit(".", 1)[0] if pid else "—"
+            st.markdown(
+                f"<div style='color:#6b6b7b; font-size:0.65rem; text-align:center; "
+                f"margin-top:4px;'>{sku_display}</div>",
+                unsafe_allow_html=True
+            )
 
-                # Quantity stepper
-                current_qty = st.session_state.quantities.get(item_id, 0)
+        with fields_col:
+            # Row 1: Title
+            new_title = st.text_input(
+                "Title",
+                value=title,
+                key=f"title_{item_id}",
+                label_visibility="collapsed",
+                placeholder="Title"
+            )
+            if new_title.strip() and new_title.strip() != title:
+                update_field(item_id, "title", new_title.strip()[:80])
+                st.cache_data.clear()
+
+            # Row 2: Price | Condition | Quantity
+            pc1, pc2, pc3 = st.columns([2, 2, 2])
+
+            with pc1:
+                st.markdown("<div class='field-label'>List Price</div>", unsafe_allow_html=True)
+                new_price = st.number_input(
+                    "Price",
+                    value=price,
+                    step=0.01,
+                    format="%.2f",
+                    key=f"price_{item_id}",
+                    label_visibility="collapsed"
+                )
+                if round(new_price, 2) != round(price, 2):
+                    update_field(item_id, "price", round(new_price, 2))
+                    update_field(item_id, "price_note", "")
+                    st.cache_data.clear()
+
+                if price_note == "new":
+                    st.markdown(
+                        "<div style='color:#f59e0b; font-size:0.65rem; margin-top:2px;'>"
+                        "⚠ no used listings found</div>",
+                        unsafe_allow_html=True
+                    )
+
+            with pc2:
+                st.markdown("<div class='field-label'>Condition</div>", unsafe_allow_html=True)
+                new_cond = st.selectbox(
+                    "Condition",
+                    ["used", "new"],
+                    index=1 if condition == "new" else 0,
+                    key=f"cond_{item_id}",
+                    label_visibility="collapsed"
+                )
+                if new_cond != condition:
+                    update_field(item_id, "condition", new_cond)
+                    st.cache_data.clear()
+                    st.rerun()
+
+            with pc3:
+                st.markdown("<div class='field-label'>Quantity</div>", unsafe_allow_html=True)
                 q1, q2, q3 = st.columns([1, 1, 1])
                 with q1:
                     if st.button("−", key=f"minus_{item_id}", use_container_width=True):
@@ -396,7 +473,7 @@ else:
                 with q2:
                     st.markdown(
                         f"<div style='text-align:center; font-size:1rem; font-weight:600; "
-                        f"color:#ffffff; padding-top:4px;'>{current_qty}</div>",
+                        f"color:#ffffff; padding-top:6px;'>{current_qty}</div>",
                         unsafe_allow_html=True
                     )
                 with q3:
@@ -407,93 +484,43 @@ else:
                         st.cache_data.clear()
                         st.rerun()
 
-                # Condition toggle
-                cond_options = ["used", "new"]
-                cond_index   = 1 if condition == "new" else 0
-                new_cond = st.selectbox(
-                    "Condition",
-                    cond_options,
-                    index=cond_index,
-                    key=f"cond_{item_id}",
+            # Row 3: Category | Cat ID | Price range
+            cc1, cc2, cc3 = st.columns([3, 1, 2])
+
+            with cc1:
+                st.markdown("<div class='field-label'>eBay Category</div>", unsafe_allow_html=True)
+                new_cat = st.text_input(
+                    "Category",
+                    value=category,
+                    key=f"cat_{item_id}",
                     label_visibility="collapsed"
                 )
-                if new_cond != condition:
-                    update_field(item_id, "condition", new_cond)
-                    st.cache_data.clear()
-                    st.rerun()
-
-    st.divider()
-
-    # ---- EXPANDED EDIT TABLE ------------------------------------- #
-
-    st.markdown(
-        "<p style='color:#6b6b7b; font-size:0.75rem; text-transform:uppercase; "
-        "letter-spacing:0.08em; font-weight:500; margin-bottom:1rem;'>Edit Items</p>",
-        unsafe_allow_html=True
-    )
-
-    for _, item in df.iterrows():
-        item_id    = str(item.get("id", ""))
-        pid        = str(item.get("photo_id", ""))
-        title      = str(item.get("title", ""))
-        price      = float(item.get("price", 0.0))
-        price_note = str(item.get("price_note", "")).strip().lower()
-        condition  = str(item.get("condition", "used")).strip().lower()
-        category   = str(item.get("ebay_category", ""))
-        cat_id     = int(item.get("ebay_category_id", 0) or 0)
-        weight_oz  = float(item.get("weight_oz", 0.0) or 0.0)
-        weight_lb  = float(item.get("weight_lb", 0.0) or 0.0)
-
-        flag_text = " 🟡 price from new listings" if price_note == "new" else ""
-        with st.expander(f"✏️  {title[:50] or pid}{flag_text}", expanded=False):
-            ec1, ec2 = st.columns(2)
-
-            with ec1:
-                new_title = st.text_input("Title", value=title, key=f"title_{item_id}")
-                if new_title != title and new_title.strip():
-                    update_field(item_id, "title", new_title.strip()[:80])
+                if new_cat.strip() != category and new_cat.strip():
+                    update_field(item_id, "ebay_category", new_cat.strip())
                     st.cache_data.clear()
 
-                new_price = st.number_input("List price ($)", value=price, step=0.01, format="%.2f", key=f"price_{item_id}")
-                if new_price != price:
-                    update_field(item_id, "price", round(new_price, 2))
-                    # If user manually sets price, clear the price_note flag
-                    update_field(item_id, "price_note", "")
-                    st.cache_data.clear()
-
-                new_cond2 = st.selectbox(
-                    "Condition",
-                    ["used", "new"],
-                    index=1 if condition == "new" else 0,
-                    key=f"cond2_{item_id}"
+            with cc2:
+                st.markdown("<div class='field-label'>Cat. ID</div>", unsafe_allow_html=True)
+                new_cat_id = st.number_input(
+                    "Cat ID",
+                    value=cat_id,
+                    step=1,
+                    key=f"catid_{item_id}",
+                    label_visibility="collapsed"
                 )
-                if new_cond2 != condition:
-                    update_field(item_id, "condition", new_cond2)
-                    st.cache_data.clear()
-
-            with ec2:
-                new_category = st.text_input("eBay Category", value=category, key=f"cat_{item_id}")
-                if new_category != category and new_category.strip():
-                    update_field(item_id, "ebay_category", new_category.strip())
-                    st.cache_data.clear()
-
-                new_cat_id = st.number_input("Category ID", value=cat_id, step=1, key=f"catid_{item_id}")
                 if int(new_cat_id) != cat_id:
                     update_field(item_id, "ebay_category_id", int(new_cat_id))
                     st.cache_data.clear()
 
-                wc1, wc2 = st.columns(2)
-                with wc1:
-                    new_oz = st.number_input("Weight (oz)", value=weight_oz, step=0.1, format="%.1f", key=f"oz_{item_id}")
-                    if round(new_oz, 1) != round(weight_oz, 1):
-                        update_field(item_id, "weight_oz", round(new_oz, 1))
-                        update_field(item_id, "weight_lb", round(new_oz / 16, 2))
-                        st.cache_data.clear()
-                with wc2:
-                    st.text_input("SKU", value=pid, disabled=True, key=f"sku_{item_id}")
+            with cc3:
+                st.markdown("<div class='field-label'>Sold Price Range</div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"<div style='color:#aaaacc; font-size:0.85rem; padding-top:6px;'>"
+                    f"{price_range}</div>",
+                    unsafe_allow_html=True
+                )
 
-            if st.button("🔄  Re-scan this item with Gemini", key=f"rescan_{item_id}"):
-                st.info("Re-scan coming in a future update — for now edit fields manually above.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.divider()
 
@@ -528,41 +555,6 @@ else:
         f"Showing {len(filtered)} of {total_items} items</p>",
         unsafe_allow_html=True
     )
-
-    # ---- TABLE --------------------------------------------------- #
-
-    display_cols = {
-        "photo_id":         st.column_config.TextColumn("SKU", width="small"),
-        "title":            st.column_config.TextColumn("Title", width="large"),
-        "ebay_category":    st.column_config.TextColumn("eBay Category", width="large"),
-        "ebay_category_id": st.column_config.NumberColumn("Cat. ID", format="%d", width="small"),
-        "condition":        st.column_config.TextColumn("Condition", width="small"),
-        "weight_oz":        st.column_config.NumberColumn("oz", format="%.1f", width="small"),
-        "weight_lb":        st.column_config.NumberColumn("lb", format="%.2f", width="small"),
-        "price_range":      st.column_config.TextColumn("Price Range", width="medium"),
-        "price":            st.column_config.NumberColumn("List Price", format="$%.2f", width="small"),
-        "price_note":       st.column_config.TextColumn("Flag", width="small"),
-        "quantity":         st.column_config.NumberColumn("Qty", format="%d", width="small"),
-        "status":           st.column_config.TextColumn("Status", width="small"),
-        "created_at":       st.column_config.DatetimeColumn("Scanned", format="MMM D h:mm a", width="medium"),
-    }
-
-    visible     = {k: v for k, v in display_cols.items() if k in filtered.columns}
-    always_hide = {"id", "price_low", "price_high", "description"}
-    hidden      = [c for c in filtered.columns if c not in visible and c not in always_hide]
-
-    st.dataframe(
-        filtered,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            **visible,
-            **{c: None for c in always_hide},
-            **{c: None for c in hidden},
-        },
-    )
-
-    st.divider()
 
     # ---- ACTIONS ------------------------------------------------- #
 
