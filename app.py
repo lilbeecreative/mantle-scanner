@@ -116,7 +116,14 @@ ARCHIVE_FILE    = "mantle_archive.csv"
 ARCHIVE_HEADERS = [
     "batch_cleared_at", "id", "photo_id", "title", "ebay_category",
     "ebay_category_id", "weight_oz", "weight_lb", "price_low", "price_high",
-    "price", "quantity", "status", "created_at"
+    "price", "price_note", "quantity", "status", "created_at"
+]
+
+EBAY_HEADER  = "Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8)"
+EBAY_COLUMNS = [
+    EBAY_HEADER, "Custom label (SKU)", "Category ID", "Title",
+    "UPC", "Price", "Quantity", "Item photo URL",
+    "Condition ID", "Description", "Format",
 ]
 
 # ------------------------------------------------------------------ #
@@ -189,29 +196,31 @@ def update_quantity(item_id: str, qty: int):
     except Exception as e:
         st.error(f"Failed to update quantity: {e}")
 
+def format_price_display(price: float, price_note: str) -> str:
+    """Returns price string with amber (new) tag if price_note is set."""
+    base = f"${price:.2f}"
+    if str(price_note).strip().lower() == "new":
+        return f"{base} · <span style='color:#f59e0b; font-size:0.7rem;'>(new)</span>"
+    return base
+
 def build_ebay_csv(df: pd.DataFrame) -> bytes:
     """
-    Builds eBay bulk upload CSV matching the exact template format.
-    INFO rows use trailing commas to match the 11-column structure.
+    Builds eBay bulk upload CSV — price is always a clean number,
+    price_note is excluded entirely from the export.
     """
     output = io.StringIO()
-
-    # eBay requires these exact INFO rows with correct column padding
     output.write('#INFO,Version=0.0.2,Template= eBay-draft-listings-template_US,,,,,,,,\n')
     output.write('#INFO Action and Category ID are required fields. 1) Set Action to Draft 2) Please find the category ID for your listings here: https://pages.ebay.com/sellerinformation/news/categorychanges.html,,,,,,,,,,\n')
     output.write('#INFO After you\'ve successfully uploaded your draft from the Seller Hub Reports tab, complete your drafts to active listings here: https://www.ebay.com/sh/lst/drafts,,,,,,,,,,\n')
     output.write('#INFO,,,,,,,,,,\n')
-
-    # Column headers
     output.write('Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8),Custom label (SKU),Category ID,Title,UPC,Price,Quantity,Item photo URL,Condition ID,Description,Format\n')
 
-    # Data rows
     writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
     for _, row in df.iterrows():
         sku         = str(row.get("photo_id", "")).rsplit(".", 1)[0]
         category_id = str(int(row.get("ebay_category_id", 0))) if row.get("ebay_category_id") else ""
         title       = str(row.get("title", ""))[:80]
-        price       = f"{float(row.get('price', 0)):.2f}"
+        price       = f"{float(row.get('price', 0)):.2f}"  # clean number only
         quantity    = str(int(row.get("quantity", 0)))
         pic_url     = photo_url(str(row.get("photo_id", "")))
         writer.writerow([
@@ -245,6 +254,9 @@ def fetch_listings():
     if "quantity" not in df.columns:
         df["quantity"] = 0
     df["quantity"] = pd.to_numeric(df["quantity"], errors="coerce").fillna(0).astype(int)
+    if "price_note" not in df.columns:
+        df["price_note"] = ""
+    df["price_note"] = df["price_note"].fillna("")
     if "price_low" in df.columns and "price_high" in df.columns:
         df["price_range"] = df.apply(
             lambda r: f"${r['price_low']:.2f} – ${r['price_high']:.2f}"
@@ -302,7 +314,7 @@ if df.empty:
     <div style="text-align:center; padding: 4rem 0; color:#6b6b7b;">
         <div style="font-size:2.5rem; margin-bottom:1rem;">📭</div>
         <div style="font-size:1.1rem; font-weight:500; color:#aaaacc;">No items in current batch</div>
-        <div style="font-size:0.85rem; margin-top:0.5rem;">Photos added to Supabase will appear here automatically</div>
+        <div style="font-size:0.85rem; margin-top:0.5rem;">Photos added via the app will appear here automatically</div>
     </div>
     """, unsafe_allow_html=True)
 else:
@@ -310,10 +322,12 @@ else:
 
     total_items = len(df)
     total_value = df["price"].sum() if "price" in df.columns else 0
+    flagged     = df[df["price_note"].str.strip().str.lower() == "new"].shape[0]
 
-    m1, m2 = st.columns(2)
+    m1, m2, m3 = st.columns(3)
     m1.metric("Items in Batch", total_items)
     m2.metric("Batch Value",    f"${total_value:,.2f}")
+    m3.metric("Price Flags",   flagged, help="Items where no used listing was found — price based on new condition")
 
     st.divider()
 
@@ -348,13 +362,14 @@ else:
     for row_df in rows:
         cols = st.columns(COLS_PER_ROW)
         for col, (_, item) in zip(cols, row_df.iterrows()):
-            item_id = str(item.get("id", ""))
-            with col:
-                pid   = str(item.get("photo_id", ""))
-                url   = photo_url(pid)
-                title = str(item.get("title", "Unknown"))
-                price = float(item.get("price", 0.0))
+            item_id    = str(item.get("id", ""))
+            pid        = str(item.get("photo_id", ""))
+            url        = photo_url(pid)
+            title      = str(item.get("title", "Unknown"))
+            price      = float(item.get("price", 0.0))
+            price_note = str(item.get("price_note", "")).strip().lower()
 
+            with col:
                 if url and image_exists(url):
                     try:
                         st.image(url, use_container_width=True)
@@ -363,12 +378,17 @@ else:
                 else:
                     st.markdown(PLACEHOLDER, unsafe_allow_html=True)
 
+                price_html = f"${price:.2f}"
+                note_html  = ""
+                if price_note == "new":
+                    note_html = " <span style='color:#f59e0b; font-size:0.65rem;'>(new)</span>"
+
                 st.markdown(
                     f"<div style='color:#aaaacc; font-size:0.72rem; margin-top:0.3rem; "
                     f"overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' "
                     f"title='{title}'>{title}</div>"
                     f"<div style='color:#ffffff; font-size:0.85rem; font-weight:600; "
-                    f"margin-top:0.1rem;'>${price:.2f}</div>",
+                    f"margin-top:0.1rem;'>{price_html}{note_html}</div>",
                     unsafe_allow_html=True
                 )
 
@@ -404,12 +424,14 @@ else:
 
     with st.expander("🔍  Filter & Search", expanded=False):
         search = st.text_input("Search", placeholder="Search by title, SKU, or eBay category...", label_visibility="collapsed")
-        col_p1, col_p2 = st.columns(2)
+        col_p1, col_p2, col_p3 = st.columns(3)
         with col_p1:
             min_price = st.number_input("Min price ($)", value=0.0, step=1.0)
         with col_p2:
             price_max_default = float(df["price"].max()) if "price" in df.columns and df["price"].max() > 0 else 9999.0
             max_price = st.number_input("Max price ($)", value=price_max_default, step=1.0)
+        with col_p3:
+            show_flagged = st.checkbox("Show flagged (new) only", value=False)
 
     filtered = df.copy()
     if search:
@@ -421,6 +443,8 @@ else:
         filtered = filtered[mask]
     if "price" in filtered.columns:
         filtered = filtered[(filtered["price"] >= min_price) & (filtered["price"] <= max_price)]
+    if show_flagged:
+        filtered = filtered[filtered["price_note"].str.strip().str.lower() == "new"]
 
     st.markdown(
         f"<p style='color:#6b6b7b; font-size:0.8rem; margin-bottom:0.5rem;'>"
@@ -439,6 +463,7 @@ else:
         "weight_lb":        st.column_config.NumberColumn("lb", format="%.2f", width="small"),
         "price_range":      st.column_config.TextColumn("Price Range", width="medium"),
         "price":            st.column_config.NumberColumn("List Price", format="$%.2f", width="small"),
+        "price_note":       st.column_config.TextColumn("Flag", width="small"),
         "quantity":         st.column_config.NumberColumn("Qty", format="%d", width="small"),
         "status":           st.column_config.TextColumn("Status", width="small"),
         "created_at":       st.column_config.DatetimeColumn("Scanned", format="MMM D h:mm a", width="medium"),
