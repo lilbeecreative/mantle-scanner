@@ -301,16 +301,6 @@ def photo_url(photo_id: str) -> str:
         return ""
     return f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
 
-@st.cache_data(ttl=300)
-def image_exists(url: str) -> bool:
-    if not url:
-        return False
-    try:
-        r = requests.head(url, timeout=8)
-        return r.status_code in (200, 301, 302)
-    except Exception:
-        return True
-
 def update_field(item_id: str, field: str, value):
     try:
         supabase.table("listings").update({field: value}).eq("id", item_id).execute()
@@ -737,19 +727,10 @@ elif st.session_state.active_tab == "dashboard":
             img_col, fields_col = st.columns([1, 4])
 
             with img_col:
-                if url and image_exists(url):
-                    try:
-                        st.image(url, use_container_width=True)
-                    except Exception:
-                        st.markdown(
-                            "<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:6px; "
-                            "height:100px; display:flex; align-items:center; justify-content:center; "
-                            "color:#4a4a5a; font-size:1.2rem;'>📷</div>", unsafe_allow_html=True)
+                if url:
+                    st.markdown(f"<img src='{url}' style='width:100%; border-radius:8px; display:block; max-height:140px; object-fit:cover;' />", unsafe_allow_html=True)
                 else:
-                    st.markdown(
-                        "<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:6px; "
-                        "height:100px; display:flex; align-items:center; justify-content:center; "
-                        "color:#4a4a5a; font-size:1.2rem;'>📷</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:6px; height:100px; display:flex; align-items:center; justify-content:center; color:#4a4a5a; font-size:1.2rem;'>📷</div>", unsafe_allow_html=True)
                 sku_display = pid.rsplit(".", 1)[0] if pid else "—"
                 st.markdown(
                     f"<div style='color:#4a4a5a; font-size:0.6rem; text-align:center; margin-top:3px;'>{sku_display}</div>",
