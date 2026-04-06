@@ -110,17 +110,6 @@ st.markdown("""
         border-radius: 8px !important;
     }
 
-    /* Item card styling */
-    .item-card-container {
-        background: #1a1a1f;
-        border: 1px solid #2a2a32;
-        border-radius: 14px;
-        padding: 1rem;
-        margin-bottom: 0.75rem;
-    }
-    .item-card-container.flagged {
-        border-color: #f59e0b44;
-    }
     .field-label {
         color: #6b6b7b;
         font-size: 0.7rem;
@@ -145,7 +134,8 @@ ARCHIVE_FILE    = "mantle_archive.csv"
 ARCHIVE_HEADERS = [
     "batch_cleared_at", "id", "photo_id", "title", "ebay_category",
     "ebay_category_id", "weight_oz", "weight_lb", "price_low", "price_high",
-    "price", "price_note", "condition", "quantity", "status", "created_at"
+    "price", "price_note", "price_used", "price_new", "condition",
+    "quantity", "status", "created_at"
 ]
 
 # ------------------------------------------------------------------ #
@@ -218,6 +208,21 @@ def update_field(item_id: str, field: str, value):
     except Exception as e:
         st.error(f"Failed to update {field}: {e}")
 
+def switch_condition(item_id: str, new_cond: str, price_used: float, price_new: float):
+    """Switch condition and update active price to the stored value for that condition."""
+    if new_cond == "used":
+        active = price_used if price_used > 0 else price_new
+        note   = "new" if price_used == 0 and price_new > 0 else ""
+    else:
+        active = price_new if price_new > 0 else price_used
+        note   = "used" if price_new == 0 and price_used > 0 else ""
+
+    supabase.table("listings").update({
+        "condition":  new_cond,
+        "price":      active,
+        "price_note": note,
+    }).eq("id", item_id).execute()
+
 def build_ebay_csv(df: pd.DataFrame) -> bytes:
     output = io.StringIO()
     output.write('#INFO,Version=0.0.2,Template= eBay-draft-listings-template_US,,,,,,,,\n')
@@ -259,7 +264,8 @@ def fetch_listings():
     df = pd.DataFrame(result.data)
     if "created_at" in df.columns:
         df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
-    for col in ["price", "price_low", "price_high", "weight_oz", "weight_lb", "ebay_category_id"]:
+    for col in ["price", "price_low", "price_high", "weight_oz", "weight_lb",
+                "ebay_category_id", "price_used", "price_new"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
     if "quantity" not in df.columns:
@@ -271,12 +277,10 @@ def fetch_listings():
     if "condition" not in df.columns:
         df["condition"] = "used"
     df["condition"] = df["condition"].fillna("used")
-    if "price_low" in df.columns and "price_high" in df.columns:
-        df["price_range"] = df.apply(
-            lambda r: f"${r['price_low']:.2f} – ${r['price_high']:.2f}"
-            if (r["price_low"] > 0 or r["price_high"] > 0) else "—",
-            axis=1
-        )
+    if "price_used" not in df.columns:
+        df["price_used"] = 0.0
+    if "price_new" not in df.columns:
+        df["price_new"] = 0.0
     return df
 
 @st.cache_data(ttl=30)
@@ -336,7 +340,7 @@ else:
 
     total_items = len(df)
     total_value = df["price"].sum() if "price" in df.columns else 0
-    flagged     = df[df["price_note"].str.strip().str.lower() == "new"].shape[0]
+    flagged     = df[df["price_note"].str.strip().str.lower().isin(["new", "used"])].shape[0]
 
     m1, m2, m3 = st.columns(3)
     m1.metric("Items in Batch", total_items)
@@ -360,18 +364,15 @@ else:
         category   = str(item.get("ebay_category", ""))
         cat_id     = int(item.get("ebay_category_id", 0) or 0)
         weight_oz  = float(item.get("weight_oz", 0.0) or 0.0)
-        weight_lb  = float(item.get("weight_lb", 0.0) or 0.0)
-        price_range = str(item.get("price_range", "—"))
-        scanned    = item.get("created_at", "")
+        price_used = float(item.get("price_used", 0.0) or 0.0)
+        price_new  = float(item.get("price_new",  0.0) or 0.0)
+        url        = photo_url(pid)
 
         if item_id and item_id not in st.session_state.quantities:
             st.session_state.quantities[item_id] = int(item.get("quantity", 0))
 
         current_qty = st.session_state.quantities.get(item_id, 0)
-        url         = photo_url(pid)
-
-        # Card border color
-        flag_color = "#f59e0b44" if price_note == "new" else "#2a2a32"
+        flag_color  = "#f59e0b44" if price_note in ("new", "used") else "#2a2a32"
 
         st.markdown(
             f"<div style='background:#1a1a1f; border:1px solid {flag_color}; "
@@ -379,7 +380,6 @@ else:
             unsafe_allow_html=True
         )
 
-        # Two column layout: photo | fields
         img_col, fields_col = st.columns([1, 3])
 
         with img_col:
@@ -400,63 +400,61 @@ else:
                     "color:#6b6b7b; font-size:1.5rem;'>📷</div>",
                     unsafe_allow_html=True
                 )
-            # SKU below photo
             sku_display = pid.rsplit(".", 1)[0] if pid else "—"
             st.markdown(
-                f"<div style='color:#6b6b7b; font-size:0.65rem; text-align:center; "
-                f"margin-top:4px;'>{sku_display}</div>",
+                f"<div style='color:#6b6b7b; font-size:0.65rem; text-align:center; margin-top:4px;'>"
+                f"{sku_display}</div>",
                 unsafe_allow_html=True
             )
 
         with fields_col:
-            # Row 1: Title
+            # Title
             new_title = st.text_input(
-                "Title",
-                value=title,
-                key=f"title_{item_id}",
-                label_visibility="collapsed",
-                placeholder="Title"
+                "Title", value=title, key=f"title_{item_id}",
+                label_visibility="collapsed", placeholder="Title"
             )
             if new_title.strip() and new_title.strip() != title:
                 update_field(item_id, "title", new_title.strip()[:80])
                 st.cache_data.clear()
 
-            # Row 2: Price | Condition | Quantity
+            # Price | Condition | Quantity
             pc1, pc2, pc3 = st.columns([2, 2, 2])
 
             with pc1:
                 st.markdown("<div class='field-label'>List Price</div>", unsafe_allow_html=True)
                 new_price = st.number_input(
-                    "Price",
-                    value=price,
-                    step=0.01,
-                    format="%.2f",
-                    key=f"price_{item_id}",
-                    label_visibility="collapsed"
+                    "Price", value=price, step=0.01, format="%.2f",
+                    key=f"price_{item_id}", label_visibility="collapsed"
                 )
                 if round(new_price, 2) != round(price, 2):
                     update_field(item_id, "price", round(new_price, 2))
                     update_field(item_id, "price_note", "")
                     st.cache_data.clear()
 
-                if price_note == "new":
+                # Show both prices as reference
+                p_used_str = f"${price_used:.2f}" if price_used > 0 else "—"
+                p_new_str  = f"${price_new:.2f}"  if price_new  > 0 else "—"
+                st.markdown(
+                    f"<div style='color:#6b6b7b; font-size:0.65rem; margin-top:2px;'>"
+                    f"Used: {p_used_str} &nbsp;·&nbsp; New: {p_new_str}</div>",
+                    unsafe_allow_html=True
+                )
+                if price_note in ("new", "used"):
                     st.markdown(
-                        "<div style='color:#f59e0b; font-size:0.65rem; margin-top:2px;'>"
-                        "⚠ no used listings found</div>",
+                        f"<div style='color:#f59e0b; font-size:0.65rem;'>"
+                        f"⚠ no {price_note} listings found — using fallback</div>",
                         unsafe_allow_html=True
                     )
 
             with pc2:
                 st.markdown("<div class='field-label'>Condition</div>", unsafe_allow_html=True)
                 new_cond = st.selectbox(
-                    "Condition",
-                    ["used", "new"],
+                    "Condition", ["used", "new"],
                     index=1 if condition == "new" else 0,
-                    key=f"cond_{item_id}",
-                    label_visibility="collapsed"
+                    key=f"cond_{item_id}", label_visibility="collapsed"
                 )
                 if new_cond != condition:
-                    update_field(item_id, "condition", new_cond)
+                    switch_condition(item_id, new_cond, price_used, price_new)
                     st.cache_data.clear()
                     st.rerun()
 
@@ -484,15 +482,13 @@ else:
                         st.cache_data.clear()
                         st.rerun()
 
-            # Row 3: Category | Cat ID | Price range
-            cc1, cc2, cc3 = st.columns([3, 1, 2])
+            # Category | Cat ID | Weight
+            cc1, cc2, cc3 = st.columns([3, 1, 1])
 
             with cc1:
                 st.markdown("<div class='field-label'>eBay Category</div>", unsafe_allow_html=True)
                 new_cat = st.text_input(
-                    "Category",
-                    value=category,
-                    key=f"cat_{item_id}",
+                    "Category", value=category, key=f"cat_{item_id}",
                     label_visibility="collapsed"
                 )
                 if new_cat.strip() != category and new_cat.strip():
@@ -502,29 +498,29 @@ else:
             with cc2:
                 st.markdown("<div class='field-label'>Cat. ID</div>", unsafe_allow_html=True)
                 new_cat_id = st.number_input(
-                    "Cat ID",
-                    value=cat_id,
-                    step=1,
-                    key=f"catid_{item_id}",
-                    label_visibility="collapsed"
+                    "Cat ID", value=cat_id, step=1,
+                    key=f"catid_{item_id}", label_visibility="collapsed"
                 )
                 if int(new_cat_id) != cat_id:
                     update_field(item_id, "ebay_category_id", int(new_cat_id))
                     st.cache_data.clear()
 
             with cc3:
-                st.markdown("<div class='field-label'>Sold Price Range</div>", unsafe_allow_html=True)
-                st.markdown(
-                    f"<div style='color:#aaaacc; font-size:0.85rem; padding-top:6px;'>"
-                    f"{price_range}</div>",
-                    unsafe_allow_html=True
+                st.markdown("<div class='field-label'>Weight (oz)</div>", unsafe_allow_html=True)
+                new_oz = st.number_input(
+                    "oz", value=weight_oz, step=0.1, format="%.1f",
+                    key=f"oz_{item_id}", label_visibility="collapsed"
                 )
+                if round(new_oz, 1) != round(weight_oz, 1):
+                    update_field(item_id, "weight_oz", round(new_oz, 1))
+                    update_field(item_id, "weight_lb", round(new_oz / 16, 2))
+                    st.cache_data.clear()
 
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.divider()
 
-    # ---- FILTERS ------------------------------------------------- #
+    # ---- FILTER -------------------------------------------------- #
 
     with st.expander("🔍  Filter & Search", expanded=False):
         search = st.text_input("Search", placeholder="Search by title, SKU, or eBay category...", label_visibility="collapsed")
@@ -535,7 +531,7 @@ else:
             price_max_default = float(df["price"].max()) if "price" in df.columns and df["price"].max() > 0 else 9999.0
             max_price = st.number_input("Max price ($)", value=price_max_default, step=1.0)
         with col_p3:
-            show_flagged = st.checkbox("Show flagged (new) only", value=False)
+            show_flagged = st.checkbox("Show flagged only", value=False)
 
     filtered = df.copy()
     if search:
@@ -548,7 +544,7 @@ else:
     if "price" in filtered.columns:
         filtered = filtered[(filtered["price"] >= min_price) & (filtered["price"] <= max_price)]
     if show_flagged:
-        filtered = filtered[filtered["price_note"].str.strip().str.lower() == "new"]
+        filtered = filtered[filtered["price_note"].str.strip().str.lower().isin(["new", "used"])]
 
     st.markdown(
         f"<p style='color:#6b6b7b; font-size:0.8rem; margin-bottom:0.5rem;'>"
