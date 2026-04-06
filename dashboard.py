@@ -418,7 +418,7 @@ display:flex; align-items:center; justify-content:space-between; height:48px;'>
 """, unsafe_allow_html=True)
 
 # Row 1: Nav tabs
-n1, n2, n3 = st.columns(3)
+n1, n2, n3, n4 = st.columns(4)
 with n1:
     if st.button("📊  Dashboard", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "dashboard" else "secondary"):
@@ -430,6 +430,11 @@ with n2:
         st.session_state.active_tab = "batch"
         st.rerun()
 with n3:
+    if st.button("🔍  Research", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "research" else "secondary"):
+        st.session_state.active_tab = "research"
+        st.rerun()
+with n4:
     if st.button("↺  Refresh", use_container_width=True, type="secondary"):
         st.cache_data.clear()
         st.rerun()
@@ -906,5 +911,149 @@ elif st.session_state.active_tab == "dashboard":
                     st.rerun()
                 else:
                     st.warning("Please enter a description.")
+
+# ================================================================== #
+#  TAB: RESEARCH
+# ================================================================== #
+
+elif st.session_state.active_tab == "research":
+
+    @st.cache_data(ttl=60)
+    def fetch_research():
+        result = (
+            supabase.table("ebay_research")
+            .select("*")
+            .order("found_at", desc=True)
+            .execute()
+        )
+        if not result.data:
+            return pd.DataFrame()
+        df = pd.DataFrame(result.data)
+        if "found_at" in df.columns:
+            df["found_at"] = pd.to_datetime(df["found_at"], errors="coerce", utc=True)
+        for col in ["ebay_price", "source_price"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        return df
+
+    st.markdown("<div class='section-label'>eBay Research — Buy It Now listings at or below your cost</div>", unsafe_allow_html=True)
+
+    research_df = fetch_research()
+
+    if research_df.empty:
+        st.markdown("""
+        <div style="text-align:center; padding:3rem 0; color:#4a4a5a;">
+            <div style="font-size:2rem; margin-bottom:0.75rem;">🔍</div>
+            <div style="font-size:1rem; font-weight:500; color:#aaaacc;">No research results yet</div>
+            <div style="font-size:0.8rem; margin-top:0.4rem;">
+                The research service runs every hour and searches eBay for items matching your inventory.<br>
+                Make sure research_service.py is running on Railway.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        source_titles = research_df["source_title"].unique()
+        total_results = len(research_df)
+        total_sources = len(source_titles)
+        profitable    = len(research_df[research_df["ebay_price"] < research_df["source_price"]])
+        last_run      = research_df["found_at"].max()
+        last_run_str  = last_run.strftime("%b %d %I:%M %p") if pd.notna(last_run) else "—"
+
+        rc1, rc2, rc3, rc4 = st.columns(4)
+        for col, val, label, color in [
+            (rc1, str(total_sources),  "Items Researched", "#2196F3"),
+            (rc2, str(total_results),  "Listings Found",   "#a855f7"),
+            (rc3, str(profitable),     "Below Your Cost",  "#22c55e"),
+            (rc4, last_run_str,        "Last Run",         "#f59e0b"),
+        ]:
+            with col:
+                st.markdown(f"""
+                <div style='background:#141418; border:1px solid #1e1e28; border-top:2px solid {color};
+                border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:0.75rem;'>
+                    <div style='color:#ffffff; font-size:1.2rem; font-weight:700; line-height:1;'>{val}</div>
+                    <div style='color:#4a4a5a; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:5px;'>{label}</div>
+                </div>""", unsafe_allow_html=True)
+
+        st.divider()
+
+        fc1, fc2 = st.columns([3, 1])
+        with fc1:
+            search_filter = st.text_input("Filter", placeholder="Search by title...", label_visibility="collapsed")
+        with fc2:
+            below_only = st.checkbox("Below cost only", value=False)
+
+        filtered_df = research_df.copy()
+        if search_filter:
+            filtered_df = filtered_df[
+                filtered_df["ebay_title"].str.contains(search_filter, case=False, na=False) |
+                filtered_df["source_title"].str.contains(search_filter, case=False, na=False)
+            ]
+        if below_only:
+            filtered_df = filtered_df[filtered_df["ebay_price"] < filtered_df["source_price"]]
+
+        st.markdown(
+            f"<p style='color:#4a4a5a; font-size:0.75rem; margin-bottom:1rem;'>Showing {len(filtered_df)} listings</p>",
+            unsafe_allow_html=True
+        )
+
+        for source_title in source_titles:
+            group = filtered_df[filtered_df["source_title"] == source_title]
+            if group.empty:
+                continue
+
+            source_price = group["source_price"].iloc[0]
+            below_count  = len(group[group["ebay_price"] < source_price])
+
+            with st.expander(
+                f"📦 {source_title[:55]}  —  your cost: ${source_price:.2f}  ·  {len(group)} listings  ·  {below_count} below cost",
+                expanded=True
+            ):
+                TILES_PER_ROW = 3
+                rows = [group.iloc[i:i+TILES_PER_ROW] for i in range(0, len(group), TILES_PER_ROW)]
+
+                for row_df in rows:
+                    cols = st.columns(TILES_PER_ROW)
+                    for col, (_, listing) in zip(cols, row_df.iterrows()):
+                        ebay_price   = float(listing.get("ebay_price", 0))
+                        ebay_title   = str(listing.get("ebay_title", ""))
+                        ebay_image   = str(listing.get("ebay_image_url", ""))
+                        ebay_url     = str(listing.get("ebay_listing_url", ""))
+                        ebay_cond    = str(listing.get("ebay_condition", ""))
+                        is_below     = ebay_price < source_price
+                        price_color  = "#22c55e" if is_below else "#ffffff"
+                        border_color = "#22c55e33" if is_below else "#1e1e28"
+                        profit       = source_price - ebay_price
+                        profit_str   = f"+${profit:.2f} margin" if is_below else f"${abs(profit):.2f} above cost"
+                        profit_color = "#22c55e" if is_below else "#4a4a5a"
+
+                        with col:
+                            if ebay_image and ebay_image != "nan":
+                                try:
+                                    st.image(ebay_image, use_container_width=True)
+                                except Exception:
+                                    st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:8px; height:120px; display:flex; align-items:center; justify-content:center; color:#4a4a5a;'>📷</div>", unsafe_allow_html=True)
+                            else:
+                                st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:8px; height:120px; display:flex; align-items:center; justify-content:center; color:#4a4a5a;'>📷</div>", unsafe_allow_html=True)
+
+                            st.markdown(f"""
+                            <div style='background:#141418; border:1px solid {border_color};
+                            border-radius:8px; padding:0.6rem 0.75rem; margin-top:6px; margin-bottom:4px;'>
+                                <div style='color:#ffffff; font-size:0.75rem; font-weight:500;
+                                overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+                                margin-bottom:6px;' title='{ebay_title}'>{ebay_title[:50]}</div>
+                                <div style='color:{price_color}; font-size:1.1rem; font-weight:700;'>${ebay_price:.2f}</div>
+                                <div style='color:{profit_color}; font-size:0.65rem; margin-top:2px;'>{profit_str}</div>
+                                <div style='color:#4a4a5a; font-size:0.65rem; margin-top:2px;'>{ebay_cond}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            if ebay_url and ebay_url != "nan":
+                                st.markdown(
+                                    f"<a href='{ebay_url}' target='_blank' style='display:block; text-align:center; "
+                                    f"background:#1a1a22; border:1px solid #2a2a38; border-radius:6px; padding:5px; "
+                                    f"color:#2196F3; font-size:0.72rem; text-decoration:none; margin-bottom:12px;'>"
+                                    f"View on eBay ↗</a>",
+                                    unsafe_allow_html=True
+                                )
 
 st.markdown("</div>", unsafe_allow_html=True)
