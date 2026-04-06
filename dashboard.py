@@ -12,11 +12,21 @@ from supabase import create_client, Client
 load_dotenv()
 
 # ------------------------------------------------------------------ #
-#  EBAY CATEGORIES — (name, category_id)
+#  EBAY CATEGORIES — expanded list including cutting tools
 # ------------------------------------------------------------------ #
 
 EBAY_CATEGORIES = [
-    # Industrial & Commercial
+    # Cutting Tools & Machining
+    ("Business & Industrial > CNC, Metalworking > Cutting Tools > End Mills", "125814"),
+    ("Business & Industrial > CNC, Metalworking > Cutting Tools > Drill Bits", "11804"),
+    ("Business & Industrial > CNC, Metalworking > Cutting Tools > Taps & Dies", "11803"),
+    ("Business & Industrial > CNC, Metalworking > Cutting Tools > Reamers", "11802"),
+    ("Business & Industrial > CNC, Metalworking > Cutting Tools > Inserts", "125817"),
+    ("Business & Industrial > CNC, Metalworking > Cutting Tools > Tool Holders", "125818"),
+    ("Business & Industrial > CNC, Metalworking > Lathes", "12584"),
+    ("Business & Industrial > CNC, Metalworking > Milling Machines", "12576"),
+    ("Business & Industrial > CNC, Metalworking > Grinding Machines", "12578"),
+    # Hydraulics & Pneumatics
     ("Business & Industrial > Hydraulics, Pneumatics > Hydraulic Pumps", "26241"),
     ("Business & Industrial > Hydraulics, Pneumatics > Hydraulic Cylinders", "26244"),
     ("Business & Industrial > Hydraulics, Pneumatics > Hydraulic Valves", "26246"),
@@ -27,29 +37,35 @@ EBAY_CATEGORIES = [
     ("Business & Industrial > Hydraulics, Pneumatics > Pneumatic Cylinders", "26260"),
     ("Business & Industrial > Hydraulics, Pneumatics > Pneumatic Valves", "26261"),
     ("Business & Industrial > Hydraulics, Pneumatics > Air Compressors", "26264"),
+    # Electrical
     ("Business & Industrial > Electrical Equipment > Electric Motors", "26215"),
     ("Business & Industrial > Electrical Equipment > Generators", "26216"),
     ("Business & Industrial > Electrical Equipment > Transformers", "26220"),
     ("Business & Industrial > Electrical Equipment > Switches & Relays", "26222"),
     ("Business & Industrial > Electrical Equipment > Control Panels", "26219"),
+    # Industrial Automation
     ("Business & Industrial > Industrial Automation > PLCs & HMIs", "32834"),
     ("Business & Industrial > Industrial Automation > Sensors & Switches", "32835"),
     ("Business & Industrial > Industrial Automation > Servo Drives", "32836"),
     ("Business & Industrial > Industrial Automation > VFDs & Inverters", "32837"),
+    # Heavy Equipment
     ("Business & Industrial > Heavy Equipment Parts > Excavator Parts", "26449"),
     ("Business & Industrial > Heavy Equipment Parts > Bulldozer Parts", "26450"),
     ("Business & Industrial > Heavy Equipment Parts > Forklift Parts", "26451"),
     ("Business & Industrial > Heavy Equipment Parts > Crane Parts", "26452"),
     ("Business & Industrial > Heavy Equipment Parts > Loader Parts", "26453"),
+    # MRO
     ("Business & Industrial > MRO & Industrial Supply > Bearings", "26279"),
     ("Business & Industrial > MRO & Industrial Supply > Seals & O-Rings", "26280"),
     ("Business & Industrial > MRO & Industrial Supply > Fasteners & Hardware", "26278"),
     ("Business & Industrial > MRO & Industrial Supply > Gears & Gearboxes", "26281"),
     ("Business & Industrial > MRO & Industrial Supply > Pulleys & Belts", "26282"),
     ("Business & Industrial > MRO & Industrial Supply > Couplings", "26283"),
+    # Test Equipment
     ("Business & Industrial > Test Equipment > Pressure Gauges", "4673"),
     ("Business & Industrial > Test Equipment > Flow Meters", "4674"),
     ("Business & Industrial > Test Equipment > Multimeters", "4675"),
+    # Pumps
     ("Business & Industrial > Pumps > Centrifugal Pumps", "26236"),
     ("Business & Industrial > Pumps > Gear Pumps", "26238"),
     ("Business & Industrial > Pumps > Diaphragm Pumps", "26237"),
@@ -78,25 +94,31 @@ EBAY_CATEGORIES = [
     # General
     ("Collectibles > Tools, Hardware & Locks", "4706"),
     ("Home & Garden > Kitchen & Dining", "20625"),
-    ("Sporting Goods > Outdoor Sports", "888"),
-    ("Toys & Hobbies > Electronic, Battery & Wind-Up", "19068"),
     ("Clothing, Shoes & Accessories > Men > Clothing", "1059"),
     ("Clothing, Shoes & Accessories > Women > Clothing", "15724"),
 ]
 
-# Build lookup dicts
 CATEGORY_LABELS = [f"{name}  [{cat_id}]" for name, cat_id in EBAY_CATEGORIES]
 LABEL_TO_ID     = {f"{name}  [{cat_id}]": cat_id for name, cat_id in EBAY_CATEGORIES}
 LABEL_TO_NAME   = {f"{name}  [{cat_id}]": name   for name, cat_id in EBAY_CATEGORIES}
 ID_TO_LABEL     = {cat_id: f"{name}  [{cat_id}]" for name, cat_id in EBAY_CATEGORIES}
 
-def find_label_for_item(category: str, cat_id: str) -> str | None:
-    """Find the matching label from existing category name or ID."""
-    if cat_id and cat_id in ID_TO_LABEL:
-        return ID_TO_LABEL[cat_id]
-    for label in CATEGORY_LABELS:
-        if category.lower() in label.lower():
-            return label
+def find_best_label(category: str, cat_id: str) -> str | None:
+    clean_id = str(cat_id).strip().replace(".0", "") if cat_id else ""
+    # 1. Exact ID match
+    if clean_id and clean_id in ID_TO_LABEL:
+        return ID_TO_LABEL[clean_id]
+    # 2. Keyword match
+    if category:
+        keywords = [k.strip().lower() for k in category.replace(">", " ").split() if len(k.strip()) > 3]
+        best_label, best_score = None, 0
+        for label in CATEGORY_LABELS:
+            score = sum(1 for kw in keywords if kw in label.lower())
+            if score > best_score:
+                best_score = score
+                best_label = label
+        if best_score >= 2:
+            return best_label
     return None
 
 # ------------------------------------------------------------------ #
@@ -116,29 +138,17 @@ st.markdown("""
     .stApp { background-color: #0a0a0c; }
     .block-container { padding: 0 !important; max-width: 100% !important; }
 
-    [data-testid="metric-container"] {
-        background: #141418;
-        border: 1px solid #1e1e28;
-        border-radius: 12px;
-        padding: 1.2rem 1.5rem;
-    }
-    [data-testid="metric-container"] label {
-        color: #4a4a5a !important;
-        font-size: 0.72rem !important;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        font-weight: 500;
-    }
-    [data-testid="metric-container"] [data-testid="stMetricValue"] {
-        color: #ffffff !important;
-        font-size: 1.9rem !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.02em;
-    }
-
     hr { border-color: #1e1e28 !important; margin: 1.5rem 0; }
 
-    [data-testid="stTextInput"] input,
+    [data-testid="stTextInput"] input {
+        background: #141418 !important;
+        border: 1px solid #1e1e28 !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        font-size: 0.85rem !important;
+    }
+    [data-testid="stTextInput"] input:focus { border-color: #2196F3 !important; }
+
     [data-testid="stNumberInput"] input {
         background: #141418 !important;
         border: 1px solid #1e1e28 !important;
@@ -146,10 +156,7 @@ st.markdown("""
         border-radius: 8px !important;
         font-size: 0.85rem !important;
     }
-    [data-testid="stTextInput"] input:focus,
-    [data-testid="stNumberInput"] input:focus {
-        border-color: #2196F3 !important;
-    }
+
     [data-testid="stSelectbox"] > div > div {
         background: #141418 !important;
         border: 1px solid #1e1e28 !important;
@@ -157,6 +164,7 @@ st.markdown("""
         border-radius: 8px !important;
         font-size: 0.85rem !important;
     }
+
     [data-testid="baseButton-secondary"] {
         background: #141418 !important;
         border: 1px solid #1e1e28 !important;
@@ -192,6 +200,7 @@ st.markdown("""
         border: 1.5px dashed #2196F3 !important;
         border-radius: 12px !important;
     }
+
     .field-label {
         color: #4a4a5a;
         font-size: 0.68rem;
@@ -220,7 +229,6 @@ st.markdown("""
     .pill-active { background: #0a1e3a; color: #2196F3; }
     .pill-processing { background: #1e1608; color: #f59e0b; }
     .pill-done { background: #0a1e10; color: #22c55e; }
-    .pill-waiting { background: #1a1a22; color: #6b6b7b; }
     .section-label {
         color: #4a4a5a;
         font-size: 0.68rem;
@@ -229,7 +237,7 @@ st.markdown("""
         font-weight: 500;
         margin-bottom: 1rem;
     }
-    .page-content { padding: 2rem 2.5rem; max-width: 1400px; margin: 0 auto; }
+    .page-content { padding: 1.5rem 2rem; max-width: 1400px; margin: 0 auto; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -250,42 +258,8 @@ ARCHIVE_HEADERS = [
     "quantity", "status", "created_at"
 ]
 
-# ------------------------------------------------------------------ #
-#  NAV BAR
-# ------------------------------------------------------------------ #
-
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "dashboard"
-
-st.markdown(f"""
-<div style='background:#0f0f13; border-bottom:1px solid #1e1e28; padding:0 2rem;
-display:flex; align-items:center; justify-content:space-between; height:56px;'>
-    <div style='color:#ffffff; font-size:1.1rem; font-weight:700; letter-spacing:-0.02em;
-    display:flex; align-items:center; gap:8px;'>
-        <div style='width:8px; height:8px; background:#2196F3; border-radius:50%;'></div>
-        Lister AI
-    </div>
-    <div style='color:#4a4a5a; font-size:0.75rem;'>Current batch</div>
-</div>
-""", unsafe_allow_html=True)
-
-ncol1, ncol2, ncol3 = st.columns([1, 1, 1])
-with ncol1:
-    if st.button("📊  Dashboard", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "dashboard" else "secondary"):
-        st.session_state.active_tab = "dashboard"
-        st.rerun()
-with ncol2:
-    if st.button("📷  Batch Upload", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "batch" else "secondary"):
-        st.session_state.active_tab = "batch"
-        st.rerun()
-with ncol3:
-    if st.button("↺  Refresh", use_container_width=True, type="secondary"):
-        st.cache_data.clear()
-        st.rerun()
-
-st.markdown("<div class='page-content'>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------ #
 #  HELPERS
@@ -302,7 +276,7 @@ def send_issue_email(description: str, submitted_at: str):
                 "from":    "Lister AI <onboarding@resend.dev>",
                 "to":      [NOTIFY_EMAIL],
                 "subject": "New Issue Submitted — Lister AI",
-                "html":    f"<h2>New Issue</h2><p>{description}</p><p style='color:#999;font-size:12px;'>{submitted_at}</p>",
+                "html":    f"<h2>New Issue</h2><p>{description}</p>",
             }
         )
     except Exception:
@@ -364,7 +338,7 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
     writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
     for _, row in df.iterrows():
         sku            = str(row.get("photo_id", "")).rsplit(".", 1)[0]
-        category_id    = str(row.get("ebay_category_id", ""))
+        category_id    = str(row.get("ebay_category_id", "")).replace(".0", "")
         title          = str(row.get("title", ""))[:80]
         price          = f"{float(row.get('price', 0)):.2f}"
         quantity       = str(int(row.get("quantity", 0)))
@@ -421,6 +395,75 @@ def fetch_issues():
         df["submitted_at"] = pd.to_datetime(df["submitted_at"], errors="coerce", utc=True)
     return df
 
+# ------------------------------------------------------------------ #
+#  NAV BAR
+# ------------------------------------------------------------------ #
+
+st.markdown("""
+<div style='background:#0f0f13; border-bottom:1px solid #1e1e28; padding:0 2rem;
+display:flex; align-items:center; justify-content:space-between; height:56px;'>
+    <div style='color:#ffffff; font-size:1.1rem; font-weight:700; letter-spacing:-0.02em;
+    display:flex; align-items:center; gap:8px;'>
+        <div style='width:8px; height:8px; background:#2196F3; border-radius:50%;'></div>
+        Lister AI
+    </div>
+    <div style='color:#4a4a5a; font-size:0.75rem;'>Current batch</div>
+</div>
+""", unsafe_allow_html=True)
+
+# Nav buttons row
+n1, n2, n3 = st.columns(3)
+with n1:
+    if st.button("📊  Dashboard", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "dashboard" else "secondary"):
+        st.session_state.active_tab = "dashboard"
+        st.rerun()
+with n2:
+    if st.button("📷  Batch Upload", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "batch" else "secondary"):
+        st.session_state.active_tab = "batch"
+        st.rerun()
+with n3:
+    if st.button("↺  Refresh", use_container_width=True, type="secondary"):
+        st.cache_data.clear()
+        st.rerun()
+
+# Download buttons row — always visible, always accessible
+df_top = fetch_listings()
+d1, d2, d3 = st.columns(3)
+with d1:
+    if not df_top.empty:
+        csv_df = df_top.copy()
+        if "created_at" in csv_df.columns:
+            csv_df["created_at"] = csv_df["created_at"].astype(str)
+        st.download_button(
+            label="⬇️  Download Raw CSV",
+            data=csv_df.to_csv(index=False).encode("utf-8"),
+            file_name="listerai_inventory.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    else:
+        st.button("⬇️  Download Raw CSV", use_container_width=True, disabled=True)
+with d2:
+    if not df_top.empty:
+        st.download_button(
+            label="🛒  Download eBay CSV",
+            data=build_ebay_csv(df_top),
+            file_name=f"listerai_ebay_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    else:
+        st.button("🛒  Download eBay CSV", use_container_width=True, disabled=True)
+with d3:
+    if st.button("🗑️  Clear Batch", use_container_width=True, type="secondary",
+                 disabled=df_top.empty):
+        st.session_state.confirm_clear = True
+        st.rerun()
+
+st.markdown("<div class='page-content'>", unsafe_allow_html=True)
+
 # ================================================================== #
 #  TAB: BATCH UPLOAD
 # ================================================================== #
@@ -436,14 +479,41 @@ if st.session_state.active_tab == "batch":
     if "current_group_id" not in st.session_state:
         st.session_state.current_group_id = None
 
-    total_items   = len(st.session_state.batch_items)
-    done_items    = sum(1 for i in st.session_state.batch_items if i["status"] == "done")
-    pending_items = sum(1 for i in st.session_state.batch_items if i["status"] == "pending")
+    total_batch   = len(st.session_state.batch_items)
+    done_batch    = sum(1 for i in st.session_state.batch_items if i["status"] == "done")
+    pending_batch = sum(1 for i in st.session_state.batch_items if i["status"] == "pending")
+    total_photos  = sum(i.get("photo_count", 0) for i in st.session_state.batch_items)
 
-    s1, s2, s3 = st.columns(3)
-    s1.metric("Items This Session", total_items)
-    s2.metric("Sent to Scanner",    pending_items + done_items)
-    s3.metric("Processed",          done_items)
+    # Stat tiles using columns
+    sc1, sc2, sc3, sc4 = st.columns(4)
+    with sc1:
+        st.markdown(f"""
+        <div style='background:#141418; border:1px solid #1e1e28; border-top:3px solid #2196F3;
+        border-radius:12px; padding:1rem 1.2rem;'>
+            <div style='color:#ffffff; font-size:2rem; font-weight:700; letter-spacing:-0.03em;'>{total_batch}</div>
+            <div style='color:#4a4a5a; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>Items This Session</div>
+        </div>""", unsafe_allow_html=True)
+    with sc2:
+        st.markdown(f"""
+        <div style='background:#141418; border:1px solid #1e1e28; border-top:3px solid #f59e0b;
+        border-radius:12px; padding:1rem 1.2rem;'>
+            <div style='color:#ffffff; font-size:2rem; font-weight:700; letter-spacing:-0.03em;'>{pending_batch}</div>
+            <div style='color:#4a4a5a; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>Processing</div>
+        </div>""", unsafe_allow_html=True)
+    with sc3:
+        st.markdown(f"""
+        <div style='background:#141418; border:1px solid #1e1e28; border-top:3px solid #22c55e;
+        border-radius:12px; padding:1rem 1.2rem;'>
+            <div style='color:#ffffff; font-size:2rem; font-weight:700; letter-spacing:-0.03em;'>{done_batch}</div>
+            <div style='color:#4a4a5a; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>Listed</div>
+        </div>""", unsafe_allow_html=True)
+    with sc4:
+        st.markdown(f"""
+        <div style='background:#141418; border:1px solid #1e1e28; border-top:3px solid #a855f7;
+        border-radius:12px; padding:1rem 1.2rem;'>
+            <div style='color:#ffffff; font-size:2rem; font-weight:700; letter-spacing:-0.03em;'>{total_photos}</div>
+            <div style='color:#4a4a5a; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>Total Photos</div>
+        </div>""", unsafe_allow_html=True)
 
     st.divider()
 
@@ -452,14 +522,14 @@ if st.session_state.active_tab == "batch":
         <div style='text-align:center; padding:3rem 0;'>
             <div style='font-size:2rem; margin-bottom:1rem;'>📦</div>
             <div style='color:#aaaacc; font-size:1rem; font-weight:500;'>Ready to scan</div>
-            <div style='color:#4a4a5a; font-size:0.85rem; margin-top:0.5rem;'>Tap New Item to start uploading photos for a product</div>
+            <div style='color:#4a4a5a; font-size:0.85rem; margin-top:0.5rem;'>Click New Item to start uploading photos for a product</div>
         </div>
         """, unsafe_allow_html=True)
     else:
         current_item_index = len(st.session_state.batch_items) + 1
         st.markdown(f"""
         <div class='batch-card active'>
-            <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;'>
+            <div style='display:flex; justify-content:space-between; align-items:center;'>
                 <div style='color:#ffffff; font-size:0.95rem; font-weight:500;'>Item {current_item_index}</div>
                 <span class='status-pill pill-active'>In progress</span>
             </div>
@@ -521,7 +591,7 @@ if st.session_state.active_tab == "batch":
                             ext       = os.path.splitext(f.name)[1].lower()
                             if ext not in (".jpg", ".jpeg", ".png", ".heic"):
                                 ext = ".jpg"
-                            filename = f"{date_code}_{time_code}_{i}{ext}"
+                            filename   = f"{date_code}_{time_code}_{i}{ext}"
                             file_bytes = f.read()
                             supabase.storage.from_("part-photos").upload(
                                 path=filename,
@@ -585,7 +655,7 @@ if st.session_state.active_tab == "batch":
             photo_count = item.get("photo_count", 0)
             condition   = item.get("condition", "used")
             qty         = item.get("qty", 1)
-            pill_class  = {"pending": "pill-processing", "done": "pill-done"}.get(status, "pill-waiting")
+            pill_class  = {"pending": "pill-processing", "done": "pill-done"}.get(status, "pill-active")
             pill_label  = {"pending": "Processing...", "done": "Listed"}.get(status, status.title())
             card_class  = {"pending": "processing", "done": "done"}.get(status, "")
             st.markdown(f"""
@@ -618,6 +688,10 @@ if st.session_state.active_tab == "batch":
 
 elif st.session_state.active_tab == "dashboard":
 
+    # Handle clear batch confirm (triggered from top bar)
+    if "confirm_clear" not in st.session_state:
+        st.session_state.confirm_clear = False
+
     df = fetch_listings()
 
     if df.empty:
@@ -631,10 +705,60 @@ elif st.session_state.active_tab == "dashboard":
     else:
         total_items = len(df)
         total_value = df["price"].sum() if "price" in df.columns else 0
+        avg_price   = df["price"].mean() if "price" in df.columns else 0
+        total_qty   = int(df["quantity"].sum()) if "quantity" in df.columns else 0
 
-        m1, m2 = st.columns(2)
-        m1.metric("Items in Batch", total_items)
-        m2.metric("Batch Value",    f"${total_value:,.2f}")
+        # Confirm clear batch if triggered
+        if st.session_state.confirm_clear:
+            st.warning(f"Archive all **{total_items}** items and clear this batch?")
+            y, n = st.columns(2)
+            with y:
+                if st.button("✅  Confirm Archive", use_container_width=True, type="primary"):
+                    try:
+                        append_to_archive(df)
+                        all_ids = df["id"].dropna().astype(str).tolist()
+                        if all_ids:
+                            supabase.table("listings").update(
+                                {"status": "archived"}
+                            ).in_("id", all_ids).execute()
+                        st.session_state.confirm_clear = False
+                        st.session_state.quantities    = {}
+                        st.cache_data.clear()
+                        st.success(f"✅  {total_items} items archived.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed: {e}")
+                        st.session_state.confirm_clear = False
+            with n:
+                if st.button("✗  Cancel", use_container_width=True):
+                    st.session_state.confirm_clear = False
+                    st.rerun()
+            st.divider()
+
+        # Modern stat tiles using columns
+        tc1, tc2, tc3 = st.columns(3)
+        with tc1:
+            st.markdown(f"""
+            <div style='background:#141418; border:1px solid #1e1e28; border-top:3px solid #2196F3;
+            border-radius:12px; padding:1.2rem 1.5rem; margin-bottom:1rem;'>
+                <div style='color:#ffffff; font-size:2.2rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{total_items}</div>
+                <div style='color:#4a4a5a; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:6px;'>Items in Batch</div>
+            </div>""", unsafe_allow_html=True)
+        with tc2:
+            st.markdown(f"""
+            <div style='background:#141418; border:1px solid #1e1e28; border-top:3px solid #22c55e;
+            border-radius:12px; padding:1.2rem 1.5rem; margin-bottom:1rem;'>
+                <div style='color:#ffffff; font-size:2.2rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>${total_value:,.2f}</div>
+                <div style='color:#4a4a5a; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:6px;'>Batch Value</div>
+                <div style='color:#6b6b7b; font-size:0.72rem; margin-top:3px;'>avg ${avg_price:.2f} per item</div>
+            </div>""", unsafe_allow_html=True)
+        with tc3:
+            st.markdown(f"""
+            <div style='background:#141418; border:1px solid #1e1e28; border-top:3px solid #f59e0b;
+            border-radius:12px; padding:1.2rem 1.5rem; margin-bottom:1rem;'>
+                <div style='color:#ffffff; font-size:2.2rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{total_qty}</div>
+                <div style='color:#4a4a5a; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:6px;'>Total Units</div>
+            </div>""", unsafe_allow_html=True)
 
         st.divider()
         st.markdown("<div class='section-label'>Items</div>", unsafe_allow_html=True)
@@ -717,7 +841,6 @@ elif st.session_state.active_tab == "dashboard":
                         update_field(item_id, "price", round(new_price, 2))
                         update_field(item_id, "price_note", "")
                         st.cache_data.clear()
-
                     p_used_str = f"${price_used:.2f}" if price_used > 0 else "—"
                     p_new_str  = f"${price_new:.2f}"  if price_new  > 0 else "—"
                     st.markdown(
@@ -728,7 +851,7 @@ elif st.session_state.active_tab == "dashboard":
                     if price_note in ("new", "used"):
                         st.markdown(
                             f"<div style='color:#f59e0b; font-size:0.65rem;'>"
-                            f"⚠ no {price_note} listings — using fallback</div>",
+                            f"⚠ no {price_note} listings — fallback used</div>",
                             unsafe_allow_html=True
                         )
 
@@ -768,38 +891,39 @@ elif st.session_state.active_tab == "dashboard":
                             st.cache_data.clear()
                             st.rerun()
 
-                # Category search | Cat ID (text) | Weight
                 cc1, cc2, cc3 = st.columns([3, 1, 1])
 
                 with cc1:
                     st.markdown("<div class='field-label'>eBay Category</div>", unsafe_allow_html=True)
-                    # Find current match in category list
-                    current_label = find_label_for_item(category, cat_id)
-                    options       = ["— type to search —"] + CATEGORY_LABELS
-                    current_index = options.index(current_label) if current_label in options else 0
-
+                    matched_label = find_best_label(category, cat_id)
+                    options       = ["— type to search or select —"] + CATEGORY_LABELS
+                    current_index = options.index(matched_label) if matched_label in options else 0
                     selected_label = st.selectbox(
-                        "eBay Category",
-                        options=options,
-                        index=current_index,
-                        key=f"cat_{item_id}",
-                        label_visibility="collapsed"
+                        "eBay Category", options=options, index=current_index,
+                        key=f"cat_{item_id}", label_visibility="collapsed"
                     )
-                    if selected_label != "— type to search —" and selected_label != current_label:
-                        new_cat_name = LABEL_TO_NAME.get(selected_label, "")
-                        new_cat_id   = LABEL_TO_ID.get(selected_label, cat_id)
-                        update_field(item_id, "ebay_category",    new_cat_name)
-                        update_field(item_id, "ebay_category_id", new_cat_id)
+                    if (selected_label != "— type to search or select —" and
+                            selected_label != matched_label):
+                        new_cat_name = LABEL_TO_NAME[selected_label]
+                        new_cat_id   = LABEL_TO_ID[selected_label]
+                        # Update both fields in one call
+                        supabase.table("listings").update({
+                            "ebay_category":    new_cat_name,
+                            "ebay_category_id": new_cat_id,
+                        }).eq("id", item_id).execute()
                         st.cache_data.clear()
                         st.rerun()
 
                 with cc2:
                     st.markdown("<div class='field-label'>Cat. ID</div>", unsafe_allow_html=True)
+                    # Show the matched cat ID if we have a match, else show stored value
+                    display_cat_id = LABEL_TO_ID.get(matched_label, cat_id) if matched_label else cat_id
+                    # Use text_input — NOT number_input — so no +/- buttons
                     new_cat_id_text = st.text_input(
-                        "Cat ID", value=cat_id,
+                        "Cat ID", value=display_cat_id,
                         key=f"catid_{item_id}", label_visibility="collapsed"
                     )
-                    if new_cat_id_text.strip() != cat_id and new_cat_id_text.strip():
+                    if new_cat_id_text.strip() and new_cat_id_text.strip() != display_cat_id:
                         update_field(item_id, "ebay_category_id", new_cat_id_text.strip())
                         st.cache_data.clear()
 
@@ -818,68 +942,7 @@ elif st.session_state.active_tab == "dashboard":
 
         st.divider()
 
-        # ---- ACTIONS ----------------------------------------- #
-
-        col_export, col_ebay, col_clear = st.columns([2, 2, 1])
-
-        with col_export:
-            csv_df = df.copy()
-            if "created_at" in csv_df.columns:
-                csv_df["created_at"] = csv_df["created_at"].astype(str)
-            st.download_button(
-                label="⬇️  Export raw CSV",
-                data=csv_df.to_csv(index=False).encode("utf-8"),
-                file_name="listerai_inventory.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-
-        with col_ebay:
-            st.download_button(
-                label="🛒  Export eBay draft CSV",
-                data=build_ebay_csv(df),
-                file_name=f"listerai_ebay_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-
-        with col_clear:
-            if "confirm_clear" not in st.session_state:
-                st.session_state.confirm_clear = False
-
-            if not st.session_state.confirm_clear:
-                if st.button("🗑️  Clear Batch", use_container_width=True, type="secondary"):
-                    st.session_state.confirm_clear = True
-                    st.rerun()
-            else:
-                st.warning(f"Archive all **{total_items}** items?")
-                y, n = st.columns(2)
-                with y:
-                    if st.button("✅  Confirm", use_container_width=True, type="primary"):
-                        try:
-                            append_to_archive(df)
-                            all_ids = df["id"].dropna().astype(str).tolist()
-                            if all_ids:
-                                supabase.table("listings").update(
-                                    {"status": "archived"}
-                                ).in_("id", all_ids).execute()
-                            st.session_state.confirm_clear = False
-                            st.session_state.quantities    = {}
-                            st.cache_data.clear()
-                            st.success(f"✅  {total_items} items archived.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed: {e}")
-                            st.session_state.confirm_clear = False
-                with n:
-                    if st.button("✗  Cancel", use_container_width=True):
-                        st.session_state.confirm_clear = False
-                        st.rerun()
-
-        st.divider()
-
-        # ---- ISSUES ------------------------------------------ #
-
+        # Issues section
         st.markdown("<div class='section-label'>Submitted Issues</div>", unsafe_allow_html=True)
         issues_df = fetch_issues()
 
