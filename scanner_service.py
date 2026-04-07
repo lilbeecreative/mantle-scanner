@@ -283,12 +283,17 @@ def make_prompt(photo_count: int, condition: str = "used", ebay_data: dict = Non
 {ebay_data["summary"]}
 
 Use the eBay market data above as your PRIMARY source for pricing.
+Also use Google Search to verify and supplement with additional sold listings.
 Prioritize sold listings over active listings for pricing accuracy.
 """
     else:
         ebay_section = """
-No eBay API data available — use your Google Search tool to find current eBay sold and active listings.
-Search for both USED and NEW condition prices separately.
+Use your Google Search tool to find current eBay pricing for this item. Search for:
+1. eBay SOLD listings (site:ebay.com "sold" keyword) — most important for accurate pricing
+2. eBay active Buy It Now listings
+3. Amazon pricing
+4. Any other marketplace (Reverb, OfferUp, Facebook Marketplace, etc.)
+Search for both USED and NEW condition prices separately and report all prices found.
 """
 
     return f"""You are a JSON-only resale pricing expert analyzing {photo_count} photo(s) of the same item.
@@ -411,23 +416,25 @@ No markdown, no backticks, just JSON."""
     # ---- STEP 2: Fetch real eBay prices (sold + active) ----
     ebay_data = {}
     if title_for_ebay != "Unknown Item":
-        print(f"   📦 Fetching eBay sold + active listings...")
+        print(f"   📦 Fetching eBay sold + active listings via API...")
         ebay_data = fetch_ebay_prices(title_for_ebay)
         if ebay_data.get("has_data"):
             sc = len(ebay_data.get("sold_used",[])) + len(ebay_data.get("sold_new",[]))
             ac = len(ebay_data.get("active_used",[])) + len(ebay_data.get("active_new",[]))
-            print(f"   ✅ eBay: {sc} sold, {ac} active listings found")
+            print(f"   ✅ eBay API: {sc} sold, {ac} active listings found")
         else:
-            print(f"   ⚠️  No eBay data — Gemini will search web")
+            print(f"   ⚠️  eBay API unavailable — Gemini will search eBay + web directly")
 
     # ---- STEP 3: Full Gemini pass with real eBay data injected ----
     prompt = make_prompt(len(image_parts), condition, ebay_data)
-    use_search = not ebay_data.get("has_data")
-    print(f"   🤖 Step 3: Gemini pricing pass (web search: {use_search})...")
+    # Always use Google Search — it finds eBay sold listings, Amazon, and other
+    # marketplaces regardless of whether the eBay API succeeded or failed
+    use_search = True
+    print(f"   🤖 Step 3: Gemini pricing pass (web search: always on)...")
 
     try:
         cfg = types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())] if use_search else []
+            tools=[types.Tool(google_search=types.GoogleSearch())]
         )
         response = client.models.generate_content(
             model=model,
