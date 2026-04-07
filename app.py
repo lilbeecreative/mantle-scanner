@@ -118,6 +118,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Mobile viewport
+st.markdown("""
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<style>
+    /* Prevent horizontal scroll on mobile */
+    body { overflow-x: hidden !important; }
+    .main .block-container { overflow-x: hidden !important; }
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
     #MainMenu, footer, header { visibility: hidden; }
@@ -257,6 +267,68 @@ st.markdown("""
         padding: 1.5rem 1rem;
         text-align: center;
         box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+
+    /* ---- MOBILE RESPONSIVE ---- */
+    @media (max-width: 768px) {
+        .page-content { padding: 0.5rem 0.6rem !important; }
+
+        /* Toolbar wraps on mobile */
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 4px !important;
+        }
+
+        /* Buttons full width on mobile */
+        [data-testid="baseButton-secondary"],
+        [data-testid="baseButton-primary"] {
+            font-size: 0.72rem !important;
+            padding: 0.25rem 0.4rem !important;
+            min-height: 36px !important;
+        }
+
+        /* Compact inputs on mobile */
+        [data-testid="stTextInput"] input {
+            font-size: 0.9rem !important;
+            height: 40px !important;
+        }
+
+        /* Item cards full width */
+        .item-card { padding: 0.5rem !important; }
+
+        /* Stat tiles smaller on mobile */
+        [data-testid="stMetric"] { padding: 0.5rem !important; }
+
+        /* Hide sidebar */
+        [data-testid="stSidebar"] { display: none !important; }
+
+        /* Camera input full width */
+        [data-testid="stCameraInput"] video,
+        [data-testid="stCameraInput"] canvas {
+            width: 100% !important;
+            max-height: 60vh !important;
+        }
+
+        /* Columns stack on mobile */
+        [data-testid="stHorizontalBlock"] > div {
+            min-width: 100px !important;
+        }
+
+        /* Images in cards */
+        img { max-height: 120px !important; }
+
+        /* Reduce font sizes */
+        .section-label { font-size: 0.58rem !important; }
+        .field-label   { font-size: 0.6rem !important; }
+    }
+
+    @media (max-width: 480px) {
+        /* Extra small phones */
+        [data-testid="baseButton-secondary"],
+        [data-testid="baseButton-primary"] {
+            font-size: 0.65rem !important;
+        }
+        .page-content { padding: 0.4rem !important; }
     }
 </style>
 """, unsafe_allow_html=True)
