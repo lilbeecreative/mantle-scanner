@@ -843,6 +843,55 @@ if st.session_state.active_tab == "camera":
                     with col: st.image(pb, use_container_width=True)
             if remaining > 0:
                 st.markdown(f"<div style='color:#4a4a5a; font-size:0.72rem; margin-bottom:4px;'>Photo {photo_count+1} of up to 10</div>", unsafe_allow_html=True)
+                # Force rear camera via JS injection
+                st.markdown("""
+                <script>
+                (function() {
+                    function forceRearCamera() {
+                        var videos = document.querySelectorAll('video');
+                        videos.forEach(function(video) {
+                            if (video.srcObject) {
+                                var tracks = video.srcObject.getTracks();
+                                tracks.forEach(function(track) { track.stop(); });
+                            }
+                        });
+                        navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: { exact: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+                        }).then(function(stream) {
+                            var videos = document.querySelectorAll('video');
+                            videos.forEach(function(v) { v.srcObject = stream; });
+                        }).catch(function() {
+                            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                            .then(function(stream) {
+                                var videos = document.querySelectorAll('video');
+                                videos.forEach(function(v) { v.srcObject = stream; });
+                            });
+                        });
+                    }
+                    setTimeout(forceRearCamera, 800);
+                })();
+                </script>
+                <style>
+                    [data-testid="stCameraInput"] { border-radius: 16px; overflow: hidden; }
+                    [data-testid="stCameraInput"] video {
+                        width: 100% !important;
+                        border-radius: 16px;
+                        max-height: 65vh;
+                        object-fit: cover;
+                    }
+                    [data-testid="stCameraInput"] button {
+                        background: #ea580c !important;
+                        color: white !important;
+                        border-radius: 50px !important;
+                        font-size: 1rem !important;
+                        font-weight: 700 !important;
+                        padding: 12px 40px !important;
+                        border: none !important;
+                        width: 100% !important;
+                        margin-top: 8px !important;
+                    }
+                </style>
+                """, unsafe_allow_html=True)
                 cam_img = st.camera_input("Take photo", label_visibility="collapsed", key=f"cam_{st.session_state.cam_group_id}_{photo_count}")
                 if cam_img:
                     st.session_state.cam_photos.append(cam_img.read()); st.rerun()
@@ -1835,25 +1884,49 @@ elif st.session_state.active_tab == "auction":
                         st.markdown(f"<div style=\'color:#475569; font-size:0.76rem; margin-bottom:5px; background:#f8fafc; border-left:3px solid #cbd5e1; padding:4px 8px; border-radius:0 6px 6px 0;\'>📝 {ai_desc}</div>", unsafe_allow_html=True)
 
                     price_str = f"${cur_price:.2f}" if cur_price > 0 else "No bids"
-                    time_str  = f" · ⏱ {time_left}" if time_left else ""
-                    if val_status == "done" and val_used_hi > 0:
-                        val_str  = f"Used: ${val_used_low:.0f}–${val_used_hi:.0f} &nbsp;·&nbsp; New: ${val_new_low:.0f}–${val_new_hi:.0f}"
-                        src_icon = "🤖" if is_gemini else "📦"
-                    elif val_status == "pending":
-                        val_str = "⏳ Looking up value..."
-                        src_icon = ""
-                    else:
-                        val_str  = "Value unavailable"
-                        src_icon = ""
+                    time_str  = f"⏱ {time_left}" if time_left else ""
 
-                    st.markdown(f"""
-                    <div style='display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:3px;'>
-                        <span style='color:#0f172a; font-size:1rem; font-weight:700;'>{price_str}</span>
-                        <span style='color:#64748b; font-size:0.75rem;'>{time_str}</span>
-                        {f"<span style='color:{margin_color}; font-size:0.72rem; font-weight:600;'>{margin_label}</span>" if margin_label else ""}
-                    </div>
-                    <div style='color:#64748b; font-size:0.72rem;'>{src_icon} Est. value: {val_str}</div>
-                    """, unsafe_allow_html=True)
+                    if val_status == "done" and val_used_hi > 0:
+                        src_icon = "🤖" if is_gemini else "📦"
+                        val_html = f"""
+                        <div style='display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-top:6px;'>
+                            <div>
+                                <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>Current Bid</div>
+                                <div style='color:#0f172a; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
+                                {f"<div style='color:#94a3b8; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
+                            </div>
+                            <div style='width:1px; background:#e2e8f0; align-self:stretch; margin:0 4px;'></div>
+                            <div>
+                                <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>{src_icon} Est. Value (Used)</div>
+                                <div style='color:{margin_color}; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>${val_used_low:.0f}–${val_used_hi:.0f}</div>
+                                <div style='color:#64748b; font-size:0.7rem; margin-top:2px;'>New: ${val_new_low:.0f}–${val_new_hi:.0f}</div>
+                            </div>
+                            {f"<div style='background:{margin_color}18; border:1px solid {margin_color}44; border-radius:8px; padding:6px 12px; align-self:center;'><div style='color:{margin_color}; font-size:0.8rem; font-weight:700;'>{margin_label}</div></div>" if margin_label else ""}
+                        </div>"""
+                    elif val_status == "pending":
+                        val_html = f"""
+                        <div style='display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-top:6px;'>
+                            <div>
+                                <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>Current Bid</div>
+                                <div style='color:#0f172a; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
+                                {f"<div style='color:#94a3b8; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
+                            </div>
+                            <div style='width:1px; background:#e2e8f0; align-self:stretch; margin:0 4px;'></div>
+                            <div>
+                                <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>Est. Value</div>
+                                <div style='color:#94a3b8; font-size:1rem; font-weight:600;'>⏳ Researching...</div>
+                            </div>
+                        </div>"""
+                    else:
+                        val_html = f"""
+                        <div style='margin-top:6px;'>
+                            <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>Current Bid</div>
+                            <div style='color:#0f172a; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
+                            {f"<div style='color:#94a3b8; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
+                            <div style='color:#94a3b8; font-size:0.75rem; margin-top:6px;'>Value unavailable</div>
+                        </div>"""
+
+                    st.markdown(val_html, unsafe_allow_html=True)
 
                 with action_col:
                     fav_label = "❤️" if favorited else "🤍"
