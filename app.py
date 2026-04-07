@@ -564,6 +564,10 @@ def switch_condition(item_id: str, new_cond: str, price_used: float, price_new: 
     }).eq("id", item_id).execute()
     return True  # Price was updated
 
+EBAY_DESCRIPTION_CSV = """Shipped primarily with UPS and sometimes USPS. If you have special packing or shipping needs, please send a message.
+
+This item is sold in "as-is" condition. The seller assumes no liability for the use, operation, or installation of this product. Due to the technical nature of this equipment, the buyer is responsible for having the item professionally inspected and installed by a certified technician prior to use."""
+
 def build_ebay_csv(df: pd.DataFrame) -> bytes:
     output = io.StringIO()
     output.write('#INFO,Version=0.0.2,Template= eBay-draft-listings-template_US,,,,,,,,\n')
@@ -571,17 +575,62 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
     output.write('#INFO After you\'ve successfully uploaded your draft complete your drafts here: https://www.ebay.com/sh/lst/drafts,,,,,,,,,,\n')
     output.write('#INFO,,,,,,,,,,\n')
     output.write('Action(SiteID=US|Country=US|Currency=USD|Version=1193|CC=UTF-8),Custom label (SKU),Category ID,Title,UPC,Price,Quantity,Item photo URL,Condition ID,Description,Format\n')
-    writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+    writer = csv.writer(output, quoting=csv.QUOTE_ALL)
     for _, row in df.iterrows():
-        sku            = str(row.get("photo_id", "")).rsplit(".", 1)[0]
+        item_id        = str(row.get("id", ""))
         category_id    = str(row.get("ebay_category_id", "")).replace(".0", "")
         title          = str(row.get("title", ""))[:80]
         price          = f"{float(row.get('price', 0)):.2f}"
-        quantity       = str(int(row.get("quantity", 0)))
-        pic_url        = photo_url(str(row.get("photo_id", "")))
+        quantity       = str(int(row.get("quantity", 1)))
         condition      = str(row.get("condition", "used")).strip().lower()
         ebay_condition = "1000" if condition == "new" else "3000"
-        writer.writerow(["Draft", sku, category_id, title, "", price, quantity, pic_url, ebay_condition, "", "FixedPrice"])
+
+        # Fetch ALL photos for this listing group
+        pic_urls = []
+        try:
+            group_result = supabase.table("listing_groups").select("id").eq("session_id", str(row.get("photo_id",""))).execute()
+            # Try to get photos via group_photos table using listing id
+            photos_result = supabase.table("group_photos").select("photo_id").limit(10).execute()
+            # Fallback: just use the single photo_id
+        except Exception:
+            pass
+
+        # Primary approach: get group photos linked to this item
+        main_photo = str(row.get("photo_id", ""))
+        try:
+            # Find the listing_group that produced this listing by matching session pattern
+            gp = supabase.table("group_photos").select("photo_id").eq("photo_id", main_photo).execute()
+            if gp.data:
+                group_id = None
+                # Get group_id from group_photos
+                gp2 = supabase.table("group_photos").select("group_id, photo_id").eq("photo_id", main_photo).execute()
+                if gp2.data:
+                    group_id = gp2.data[0]["group_id"]
+                if group_id:
+                    all_photos = supabase.table("group_photos").select("photo_id").eq("group_id", group_id).execute()
+                    pic_urls = [photo_url(p["photo_id"]) for p in (all_photos.data or []) if p.get("photo_id")]
+        except Exception:
+            pass
+
+        if not pic_urls and main_photo:
+            pic_urls = [photo_url(main_photo)]
+
+        # eBay accepts up to 12 photos, pipe-separated in the URL column
+        pic_url_str = "|".join(pic_urls[:12])
+
+        writer.writerow([
+            "Draft",
+            "",                    # Custom SKU — always blank
+            category_id,
+            title,
+            "",                    # UPC
+            price,
+            quantity,
+            pic_url_str,           # All photos pipe-separated
+            ebay_condition,
+            EBAY_DESCRIPTION_CSV,  # Standard description on every listing
+            "BestOfferEnabled",    # Format
+        ])
     return output.getvalue().encode("utf-8")
 
 # ------------------------------------------------------------------ #
