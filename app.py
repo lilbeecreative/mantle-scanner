@@ -1743,18 +1743,18 @@ elif st.session_state.active_tab == "auction":
             ids = st.session_state.get("auction_enrich_ids", [i["id"] for i in items if i.get("value_status") == "pending"])
             total_e = len(ids)
             if total_e > 0:
-                prog = st.progress(0, text=f"Researching {total_e} items across the web...")
-                def update_prog(done, total, title):
-                    prog.progress(done/total, text=f"Researching {done}/{total}: {title[:40]}...")
-                try:
-                    from auction_scraper import enrich_values
-                    enrich_values(ids, progress_callback=update_prog)
-                    prog.empty()
-                    st.cache_data.clear()
-                    st.rerun()
-                except Exception as e:
-                    prog.empty()
-                    st.error(f"Value lookup failed: {e}")
+                import threading
+                st.info(f"🔍 Researching {total_e} items in the background — refresh the page in a few minutes to see values populate.", icon="⏳")
+
+                def run_enrich(item_ids):
+                    try:
+                        from auction_scraper import enrich_values
+                        enrich_values(item_ids)
+                    except Exception as e:
+                        print(f"Enrich error: {e}")
+
+                t = threading.Thread(target=run_enrich, args=(ids,), daemon=True)
+                t.start()
 
         # Session action bar
         source_url = session_info.get("source_url","") if session_info else ""
