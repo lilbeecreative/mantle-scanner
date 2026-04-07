@@ -1894,9 +1894,15 @@ elif st.session_state.active_tab == "auction":
                     st.rerun()
 
         with ac3:
-            # Archive session (keeps data, just marks archived)
+            # Archive session (keeps data, stops enrichment, marks archived)
             if st.button("📦  Archive", use_container_width=True, type="secondary", key="auction_archive"):
                 try:
+                    # Stop enrichment thread if running
+                    flag = getattr(st.session_state, "_enrich_stop_flag", {})
+                    if flag:
+                        flag["stop"] = True
+                    st.session_state.auction_enrich_running = False
+                    st.session_state.auction_auto_enrich    = False
                     supabase.table("auction_sessions").update(
                         {"status": "archived"}
                     ).eq("session_id", session_id).execute()
