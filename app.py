@@ -433,7 +433,7 @@ def submit_to_ebay(item: dict) -> dict:
             timeout=20
         )
         print(f"eBay response status: {resp.status_code}")
-        print(f"eBay response: {resp.text[:2000]}")
+        print(f"eBay FULL response: {resp.text}")
 
         root = ET.fromstring(resp.text)
         ns   = {"e": "urn:ebay:apis:eBLBaseComponents"}
