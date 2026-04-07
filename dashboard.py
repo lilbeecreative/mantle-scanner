@@ -558,7 +558,7 @@ box-shadow: 0 1px 4px rgba(0,0,0,0.06);'>
 """, unsafe_allow_html=True)
 
 # Color-coded nav toolbar — separated from page content
-st.markdown("<div style='background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:4px 8px; display:flex; gap:4px;'>", unsafe_allow_html=True)
+st.markdown("<div style='background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:4px 8px;'>", unsafe_allow_html=True)
 t1, t2, t3, t4, t5, t6 = st.columns([2, 1.5, 1.5, 1.5, 1.5, 1.5])
 with t1:
     st.markdown("<div class='tab-dashboard'>", unsafe_allow_html=True)
@@ -566,6 +566,35 @@ with t1:
                  type="primary" if st.session_state.active_tab == "dashboard" else "secondary"):
         st.session_state.active_tab = "dashboard"
         st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t2:
+    st.markdown("<div class='tab-camera'>", unsafe_allow_html=True)
+    if st.button("📸  Scan New Items", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "camera" else "secondary"):
+        st.session_state.active_tab = "camera"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t3:
+    st.markdown("<div class='tab-batch'>", unsafe_allow_html=True)
+    if st.button("📁  Batch Upload", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "batch" else "secondary"):
+        st.session_state.active_tab = "batch"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t4:
+    st.markdown("<div class='tab-research'>", unsafe_allow_html=True)
+    if st.button("🔍  Research", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "research" else "secondary"):
+        st.session_state.active_tab = "research"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t5:
+    st.markdown("<div class='tab-auction'>", unsafe_allow_html=True)
+    if st.button("🔨  Auction Scanner", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "auction" else "secondary"):
+        st.session_state.active_tab = "auction"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 # ================================================================== #
 #  TAB: CAMERA SCAN
 # ================================================================== #
