@@ -14,9 +14,7 @@ load_dotenv()
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 GEMINI_KEY   = os.getenv("GEMINI_KEY") or os.getenv("GEMINI_API_KEY")
-
-# eBay Production API — swap in when production key is ready
-EBAY_APP_ID  = os.getenv("EBAY_APP_ID", "")  # set in Railway env vars
+EBAY_APP_ID  = os.getenv("EBAY_APP_ID", "")
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -26,10 +24,6 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.5",
 }
-
-# ------------------------------------------------------------------ #
-#  GEMINI CLIENT
-# ------------------------------------------------------------------ #
 
 _gemini_client = None
 _gemini_model  = None
@@ -70,44 +64,70 @@ def is_poor_title(title: str) -> bool:
     return any(w in VAGUE_WORDS for w in words)
 
 # ------------------------------------------------------------------ #
-#  GEMINI: INTERNET-WIDE VALUE RESEARCH
+#  PRICE EXTRACTION FROM TEXT
 # ------------------------------------------------------------------ #
 
-def research_value_gemini(title: str, current_price: float) -> dict:
+def extract_prices_from_text(text: str) -> list[float]:
+    """Pull all dollar amounts from a block of text."""
+    matches = re.findall(r'\$\s*([\d,]+(?:\.\d{1,2})?)', text)
+    prices = []
+    for m in matches:
+        try:
+            v = float(m.replace(",", ""))
+            if 0.5 < v < 100000:
+                prices.append(v)
+        except Exception:
+            continue
+    return prices
+
+def prices_to_range(prices: list[float], condition: str = "used") -> dict:
+    """Convert a list of prices into low/high range for used and new."""
+    if not prices:
+        return {}
+    prices_sorted = sorted(prices)
+    # Remove outliers (top and bottom 10% if enough data)
+    if len(prices_sorted) >= 5:
+        cut = max(1, len(prices_sorted) // 10)
+        prices_sorted = prices_sorted[cut:-cut]
+    low  = round(min(prices_sorted), 2)
+    high = round(max(prices_sorted), 2)
+    mid  = round(sum(prices_sorted) / len(prices_sorted), 2)
+    if condition == "used":
+        return {
+            "value_used_low":  low,
+            "value_used_high": high,
+            "value_new_low":   round(high * 1.15, 2),
+            "value_new_high":  round(high * 1.5,  2),
+        }
+    else:
+        return {
+            "value_used_low":  round(low * 0.6, 2),
+            "value_used_high": round(high * 0.75, 2),
+            "value_new_low":   low,
+            "value_new_high":  high,
+        }
+
+# ------------------------------------------------------------------ #
+#  STEP 1: GEMINI GOOGLE SEARCH (natural language response)
+# ------------------------------------------------------------------ #
+
+def gemini_web_search(query: str) -> str:
     """
-    Use Gemini + Google Search to research item value across the entire internet.
-    Searches eBay sold/active, Amazon, Google Shopping, local listings, and more.
+    Call Gemini with Google Search grounding.
+    Returns the full natural language response text including prices found.
     """
     if not GEMINI_KEY:
-        return {"value_status": "unavailable", "value_source": "gemini_search"}
-
+        return ""
     try:
         from google.genai import types
         client, model = get_gemini()
 
-        prompt = f"""You are a resale pricing expert. Research the current market value of this item.
-
-Item: "{title}"
-Current auction bid: ${current_price:.2f}
-
-Search the internet thoroughly — check:
-1. eBay SOLD listings (most important)
-2. eBay active listings  
-3. Amazon pricing
-4. Google Shopping
-5. Any other marketplace listings you find
-
-Return ONLY a raw JSON object with no markdown or backticks:
-{{
-  "value_used_low": lowest realistic resale price for used condition as number,
-  "value_used_high": highest realistic resale price for used condition as number,
-  "value_new_low": lowest price for new condition as number,
-  "value_new_high": highest price for new condition as number,
-  "sources_checked": ["eBay sold", "Amazon", etc],
-  "notes": "brief note on pricing basis or market conditions"
-}}
-
-Use 0 for any value you cannot determine. Numbers only, no $ signs."""
+        prompt = (
+            f"Search the internet and find the current market value of: {query}\n\n"
+            f"Search eBay sold listings, eBay active listings, Amazon, Google Shopping, "
+            f"industrial supply sites, machinery dealers, and any other relevant marketplace. "
+            f"Report all prices you find with their source. Be specific about used vs new pricing."
+        )
 
         response = client.models.generate_content(
             model=model,
@@ -116,10 +136,61 @@ Use 0 for any value you cannot determine. Numbers only, no $ signs."""
                 tools=[types.Tool(google_search=types.GoogleSearch())]
             )
         )
+        return response.text or ""
+    except Exception as e:
+        print(f"Gemini search error: {e}")
+        return ""
+
+# ------------------------------------------------------------------ #
+#  STEP 2: GEMINI EXTRACT STRUCTURED DATA FROM SEARCH RESULTS
+# ------------------------------------------------------------------ #
+
+def gemini_extract_values(title: str, search_text: str, current_price: float) -> dict:
+    """
+    Given raw search result text, use Gemini to extract structured value estimates.
+    This second call does NOT use search — it just reads and parses.
+    """
+    if not GEMINI_KEY or not search_text:
+        return {}
+    try:
+        from google.genai import types
+        client, model = get_gemini()
+
+        prompt = f"""Based on this market research data, extract pricing for: "{title}"
+Current auction bid: ${current_price:.2f}
+
+Research data:
+{search_text[:3000]}
+
+Return ONLY a raw JSON object, no markdown, no backticks, no extra text:
+{{
+  "value_used_low": number,
+  "value_used_high": number,
+  "value_new_low": number,
+  "value_new_high": number,
+  "notes": "brief note on sources used"
+}}
+
+Rules:
+- All values must be plain numbers (no $ signs, no commas)
+- Use 0 if you cannot determine a value
+- Base used pricing on sold/used listings found
+- Base new pricing on new retail prices found
+- If only one price point found, set low = high * 0.7"""
+
+        response = client.models.generate_content(
+            model=model,
+            contents=[prompt],
+            config=types.GenerateContentConfig(max_output_tokens=500)
+        )
 
         raw = response.text.strip()
         raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.IGNORECASE)
         raw = re.sub(r"\n?```$", "", raw).strip()
+        # Sometimes Gemini wraps in extra text — find the JSON block
+        json_match = re.search(r'\{[^{}]+\}', raw, re.DOTALL)
+        if json_match:
+            raw = json_match.group()
         data = json.loads(raw)
 
         def safe(v):
@@ -133,20 +204,65 @@ Use 0 for any value you cannot determine. Numbers only, no $ signs."""
             "value_used_high": safe(data.get("value_used_high", 0)),
             "value_new_low":   safe(data.get("value_new_low", 0)),
             "value_new_high":  safe(data.get("value_new_high", 0)),
-            "value_status":    "done",
-            "value_source":    "gemini_search",
-            "ai_description":  data.get("notes", ""),
+            "notes":           str(data.get("notes", "")),
         }
-
     except Exception as e:
-        print(f"Gemini search error: {e}")
+        print(f"Gemini extract error: {e}")
+        return {}
+
+# ------------------------------------------------------------------ #
+#  MAIN VALUE RESEARCH (clear titles)
+# ------------------------------------------------------------------ #
+
+def research_value_gemini(title: str, current_price: float) -> dict:
+    """
+    Two-step approach:
+    1. Gemini + Google Search → gets natural language with real prices from across the web
+    2. Gemini extraction → parses that text into structured low/high values
+    Falls back to regex price extraction if step 2 fails.
+    """
+    print(f"  Searching web for: {title[:60]}")
+
+    # Step 1: Web search
+    search_text = gemini_web_search(title)
+    if not search_text:
         return {"value_status": "unavailable", "value_source": "gemini_search"}
 
+    print(f"  Got {len(search_text)} chars of search results")
+
+    # Step 2: Extract structured values
+    values = gemini_extract_values(title, search_text, current_price)
+
+    if values and (values.get("value_used_high", 0) > 0 or values.get("value_new_high", 0) > 0):
+        return {
+            **values,
+            "ai_description": values.get("notes", ""),
+            "value_status":   "done",
+            "value_source":   "gemini_search",
+        }
+
+    # Fallback: regex extract prices from search text
+    print(f"  Falling back to regex price extraction")
+    prices = extract_prices_from_text(search_text)
+    if prices:
+        range_vals = prices_to_range(prices, "used")
+        return {
+            **range_vals,
+            "ai_description": f"Prices found via web search: {', '.join(f'${p:.0f}' for p in sorted(prices)[:5])}",
+            "value_status":   "done",
+            "value_source":   "gemini_search",
+        }
+
+    return {"value_status": "unavailable", "value_source": "gemini_search"}
+
+# ------------------------------------------------------------------ #
+#  GEMINI VISION (mixed lots / poor titles)
+# ------------------------------------------------------------------ #
 
 def analyze_image_gemini(image_url: str, title: str, current_price: float) -> dict:
     """
-    For poor/mixed lot titles: analyze the image with Gemini Vision.
-    Identifies items, generates a description, and researches value.
+    For vague/mixed lot titles: analyze the image with Gemini Vision,
+    identify all items, then search the web for their values.
     """
     if not GEMINI_KEY or not image_url:
         return {"value_status": "unavailable", "value_source": "gemini_vision"}
@@ -163,64 +279,51 @@ def analyze_image_gemini(image_url: str, title: str, current_price: float) -> di
         from google.genai import types
         client, model = get_gemini()
 
-        prompt = f"""You are a resale pricing expert analyzing an auction lot image.
+        # Step 1: Vision — identify what's in the image
+        vision_prompt = f"""Look carefully at this auction lot image. The listing title is: "{title}"
 
-Original listing title: "{title}"
-Current auction bid: ${current_price:.2f}
+List EVERY item you can see. Be specific — include brands, models, quantities, and condition if visible.
+Then search the internet to find the resale value of these items.
 
-Step 1 — Look carefully at the image. Identify EVERY visible item: brands, models, quantities, condition.
+Report:
+1. What specific items you see
+2. Prices found on eBay, Amazon, Google Shopping, and any other marketplace for each item
+3. Your total estimated value for the lot
 
-Step 2 — Use Google Search to research the resale value of these items on eBay, Amazon, and other marketplaces.
+Include all dollar amounts you find."""
 
-Return ONLY a raw JSON object (no markdown, no backticks):
-{{
-  "description": "Clear specific description of what is in this lot — 1-2 sentences, mention specific brands/models if visible",
-  "items_identified": ["specific item 1 with brand if visible", "item 2", ...],
-  "value_used_low": total lot value low end in used condition as number,
-  "value_used_high": total lot value high end in used condition as number,
-  "value_new_low": total value if items were new as number,
-  "value_new_high": total value if items were new high end as number,
-  "confidence": "high" or "medium" or "low",
-  "notes": "brief note on what drove the valuation"
-}}
-
-Be specific. If you see a Milwaukee drill, say Milwaukee drill. Not just "power tool".
-All values as numbers only."""
-
-        from google.genai import types
         image_part = types.Part.from_bytes(data=img_bytes, mime_type=content_type)
-
         response = client.models.generate_content(
             model=model,
-            contents=[image_part, prompt],
+            contents=[image_part, vision_prompt],
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())]
             )
         )
+        vision_text = response.text or ""
+        print(f"  Vision response: {len(vision_text)} chars")
 
-        raw = response.text.strip()
-        raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.IGNORECASE)
-        raw = re.sub(r"\n?```$", "", raw).strip()
-        data = json.loads(raw)
+        # Step 2: Extract structured values from vision text
+        values = gemini_extract_values(title, vision_text, current_price)
 
-        def safe(v):
-            try:
-                return round(float(str(v).replace("$","").replace(",","")), 2)
-            except Exception:
-                return 0.0
+        # Also try regex fallback
+        if not values or values.get("value_used_high", 0) == 0:
+            prices = extract_prices_from_text(vision_text)
+            if prices:
+                values = prices_to_range(prices, "used")
 
-        items_list = data.get("items_identified", [])
-        items_str  = ", ".join(items_list[:6]) if items_list else ""
+        # Extract item description from vision text (first 2 sentences)
+        sentences = [s.strip() for s in vision_text.split('.') if len(s.strip()) > 20]
+        description = '. '.join(sentences[:2])[:400] if sentences else ""
 
         return {
-            "ai_description":  str(data.get("description",""))[:500],
-            "ai_items":        items_str[:300],
-            "ai_confidence":   str(data.get("confidence","low")),
-            "value_used_low":  safe(data.get("value_used_low",0)),
-            "value_used_high": safe(data.get("value_used_high",0)),
-            "value_new_low":   safe(data.get("value_new_low",0)),
-            "value_new_high":  safe(data.get("value_new_high",0)),
-            "value_status":    "done",
+            "ai_description":  description,
+            "ai_confidence":   "high" if values.get("value_used_high", 0) > 0 else "low",
+            "value_used_low":  values.get("value_used_low", 0),
+            "value_used_high": values.get("value_used_high", 0),
+            "value_new_low":   values.get("value_new_low", 0),
+            "value_new_high":  values.get("value_new_high", 0),
+            "value_status":    "done" if values.get("value_used_high", 0) > 0 else "unavailable",
             "value_source":    "gemini_vision",
         }
 
@@ -230,97 +333,43 @@ All values as numbers only."""
         return research_value_gemini(title, current_price)
 
 # ------------------------------------------------------------------ #
-#  eBay FINDING API (Production — swap in when PRD key is available)
+#  eBay Finding API (Production only)
 # ------------------------------------------------------------------ #
 
-def _ebay_search(operation: str, short_title: str, extra_params: dict) -> list[float]:
-    """Run one eBay Finding API search and return list of prices."""
-    params = {
-        "OPERATION-NAME":                operation,
-        "SERVICE-VERSION":               "1.0.0",
-        "SECURITY-APPNAME":              EBAY_APP_ID,
-        "RESPONSE-DATA-FORMAT":          "JSON",
-        "keywords":                      short_title,
-        "sortOrder":                     "EndTimeSoonest",
-        "paginationInput.entriesPerPage": "10",
-    }
-    params.update(extra_params)
-    resp = requests.get(
-        "https://svcs.ebay.com/services/search/FindingService/v1",
-        params=params, timeout=10
-    )
-    data = resp.json()
-    key  = f"{operation}Response"
-    items = (data.get(key, [{}])[0]
-                 .get("searchResult", [{}])[0]
-                 .get("item", []))
-    prices = []
-    for item in items:
-        try:
-            price = float(item["sellingStatus"][0]["currentPrice"][0]["__value__"])
-            if price > 0:
-                prices.append(price)
-        except Exception:
-            continue
-    return prices
-
 def lookup_ebay_api(title: str) -> dict | None:
-    """
-    Query the eBay Finding API for BOTH sold/completed AND active listings.
-    Combines both datasets to give a realistic value range.
-    Returns None if no production key is configured.
-    """
     if not EBAY_APP_ID or "SBX" in EBAY_APP_ID:
         return None
-
     try:
         short_title = " ".join(title.split()[:6])
-
-        # 1. Sold / completed listings (most accurate for value)
-        sold_prices = _ebay_search(
-            "findCompletedItems", short_title,
-            {"itemFilter(0).name": "SoldItemsOnly", "itemFilter(0).value": "true"}
+        resp = requests.get(
+            "https://svcs.ebay.com/services/search/FindingService/v1",
+            params={
+                "OPERATION-NAME":          "findCompletedItems",
+                "SERVICE-VERSION":         "1.0.0",
+                "SECURITY-APPNAME":        EBAY_APP_ID,
+                "RESPONSE-DATA-FORMAT":    "JSON",
+                "keywords":                short_title,
+                "sortOrder":               "EndTimeSoonest",
+                "paginationInput.entriesPerPage": "10",
+                "itemFilter(0).name":      "SoldItemsOnly",
+                "itemFilter(0).value":     "true",
+            },
+            timeout=10
         )
-
-        # 2. Active BIN listings (shows current market ask price)
-        active_prices = _ebay_search(
-            "findItemsByKeywords", short_title,
-            {"itemFilter(0).name": "ListingType", "itemFilter(0).value": "FixedPrice"}
-        )
-
-        print(f"  eBay sold prices: {sold_prices}")
-        print(f"  eBay active prices: {active_prices}")
-
-        if not sold_prices and not active_prices:
-            return None
-
-        all_prices = sold_prices + active_prices
-
-        # Sold prices = realistic value, active prices = asking price
-        # Used value based on sold comps, new value based on active listings
-        if sold_prices:
-            used_low  = round(min(sold_prices), 2)
-            used_high = round(max(sold_prices), 2)
-        else:
-            used_low  = round(min(all_prices) * 0.7, 2)
-            used_high = round(max(all_prices) * 0.8, 2)
-
-        if active_prices:
-            new_low  = round(min(active_prices), 2)
-            new_high = round(max(active_prices), 2)
-        else:
-            new_low  = round(used_high * 1.2, 2)
-            new_high = round(used_high * 1.5, 2)
-
-        return {
-            "value_used_low":  used_low,
-            "value_used_high": used_high,
-            "value_new_low":   new_low,
-            "value_new_high":  new_high,
-            "value_status":    "done",
-            "value_source":    "ebay_api",
-            "ai_description":  f"eBay: {len(sold_prices)} sold comps, {len(active_prices)} active listings",
-        }
+        data = resp.json()
+        items = (data.get("findCompletedItemsResponse",[{}])[0]
+                     .get("searchResult",[{}])[0]
+                     .get("item",[]))
+        prices = []
+        for item in items:
+            try:
+                price = float(item["sellingStatus"][0]["currentPrice"][0]["__value__"])
+                prices.append(price)
+            except Exception:
+                continue
+        if prices:
+            range_vals = prices_to_range(prices, "used")
+            return {**range_vals, "value_status": "done", "value_source": "ebay_api"}
     except Exception as e:
         print(f"eBay API error: {e}")
     return None
@@ -339,7 +388,7 @@ def parse_price(text: str) -> float:
         return 0.0
 
 # ------------------------------------------------------------------ #
-#  SCRAPE AUCTION PAGE
+#  SCRAPING
 # ------------------------------------------------------------------ #
 
 def scrape_auction_page(url: str) -> list[dict]:
@@ -383,13 +432,12 @@ def scrape_auction_page(url: str) -> list[dict]:
 
     except Exception as e:
         print(f"Scrape error: {e}")
-
     return items
 
 def _parse_jsonld(data: dict) -> list[dict]:
     items = []
     if data.get("@type") == "ItemList":
-        for el in data.get("itemListElement", []):
+        for el in data.get("itemListElement",[]):
             item = el.get("item", el)
             items.append({
                 "title":         item.get("name","Unknown"),
@@ -504,7 +552,7 @@ def get_page_url(base_url: str, page: int) -> str:
     return f"{base_url}?page={page}"
 
 # ------------------------------------------------------------------ #
-#  STORE ITEMS
+#  STORE
 # ------------------------------------------------------------------ #
 
 def scrape_and_store(url: str, session_id: str, pages: list[int]) -> list[str]:
@@ -535,19 +583,19 @@ def scrape_and_store(url: str, session_id: str, pages: list[int]) -> list[str]:
             inserted_ids.append(result.data[0]["id"])
         except Exception as e:
             print(f"Insert error: {e}")
-
     return inserted_ids
 
 # ------------------------------------------------------------------ #
-#  ENRICH VALUES — auto-routing, no manual trigger needed
+#  ENRICH VALUES
 # ------------------------------------------------------------------ #
 
 def enrich_values(item_ids: list[str], progress_callback=None):
     """
-    Automatically called after scraping.
-    Routes each item to the best analysis method:
-      - Poor/mixed lot title + image → Gemini Vision (identifies items + searches web)
-      - Clear title → eBay API (if production key set) OR Gemini + Google Search
+    Route each item to best research method:
+    - Poor/vague title + image → Gemini Vision (sees what's in the photo, searches web)
+    - Clear title → eBay API (if production key) then Gemini web search
+    - Gemini web search searches ALL of: eBay, Amazon, Google Shopping,
+      industrial suppliers, machinery dealers, and any other marketplace
     """
     total = len(item_ids)
     for idx, item_id in enumerate(item_ids):
@@ -569,24 +617,23 @@ def enrich_values(item_ids: list[str], progress_callback=None):
         poor = is_poor_title(title)
 
         if poor and image_url:
-            # Mixed lot / vague title — use Gemini Vision to see what's actually in it
             print(f"[{idx+1}/{total}] Gemini Vision (lot): {title[:50]}")
             values = analyze_image_gemini(image_url, title, current_price)
         else:
-            # Clear title — try eBay API first, fall back to Gemini search
+            # Try eBay API first (fast, accurate for common items)
             ebay_result = lookup_ebay_api(title)
-            if ebay_result:
+            if ebay_result and ebay_result.get("value_used_high", 0) > 0:
                 print(f"[{idx+1}/{total}] eBay API: {title[:50]}")
                 values = ebay_result
             else:
-                print(f"[{idx+1}/{total}] Gemini Search (web): {title[:50]}")
+                # Full web search via Gemini — searches ENTIRE internet
+                print(f"[{idx+1}/{total}] Gemini web search: {title[:50]}")
                 values = research_value_gemini(title, current_price)
-                # If still nothing and there's an image, try vision as last resort
+                # Last resort: vision if image available
                 if values.get("value_status") == "unavailable" and image_url:
                     print(f"  → Falling back to Gemini Vision")
                     values = analyze_image_gemini(image_url, title, current_price)
 
-        # Write results to DB
         update = {
             "value_used_low":  values.get("value_used_low", 0),
             "value_used_high": values.get("value_used_high", 0),
@@ -601,4 +648,4 @@ def enrich_values(item_ids: list[str], progress_callback=None):
             update["ai_confidence"]  = values["ai_confidence"]
 
         supabase.table("auction_items").update(update).eq("id", item_id).execute()
-        time.sleep(1.5)  # be gentle with APIs
+        time.sleep(1)
