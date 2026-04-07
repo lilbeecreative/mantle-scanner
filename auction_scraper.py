@@ -36,11 +36,13 @@ def get_gemini():
         try:
             models = [m.name for m in _gemini_client.models.list()]
             _gemini_model = next(
-                (m for m in models if "gemini-1.5-pro" in m),
-                next((m for m in models if "gemini-1.5" in m), "models/gemini-1.5-flash")
+                (m for m in models if "gemini-2.0-flash" in m),
+                next((m for m in models if "gemini-2.0" in m),
+                next((m for m in models if "gemini-1.5-pro" in m),
+                "models/gemini-2.0-flash"))
             )
         except Exception:
-            _gemini_model = "models/gemini-1.5-flash"
+            _gemini_model = "models/gemini-2.0-flash"
     return _gemini_client, _gemini_model
 
 # ------------------------------------------------------------------ #
