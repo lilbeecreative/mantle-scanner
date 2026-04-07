@@ -928,111 +928,174 @@ elif st.session_state.active_tab == "batch":
         supabase.storage.from_("part-photos").upload(path=fn, file=fixed, file_options={"content-type":"image/jpeg","upsert":"true"})
         supabase.table("group_photos").insert({"group_id":group_id,"photo_id":fn}).execute()
 
+    def create_file_group():
+        result = supabase.table("listing_groups").insert({
+            "session_id": st.session_state.file_batch_id,
+            "status": "waiting", "quantity": 1,
+            "condition": st.session_state.file_condition
+        }).execute()
+        return result.data[0]["id"]
+
     for k,v in [("file_batch_id",None),("file_condition","used"),("file_items",[]),("file_group_id",None),("file_qty",1)]:
         if k not in st.session_state: st.session_state[k] = v
 
+    # ── NO ACTIVE BATCH — just condition + start ──────────────────
     if st.session_state.file_batch_id is None:
         st.markdown("""
-        <div style='text-align:center; padding:2rem 0 1rem;'>
-            <div style='font-size:2.5rem; margin-bottom:0.5rem;'>🗂️</div>
-            <div style='color:#111827; font-size:1.1rem; font-weight:600;'>File Upload</div>
-            <div style='color:#4a4a5a; font-size:0.82rem; margin-top:0.3rem;'>Upload multiple photos per item from your device</div>
-        </div>""", unsafe_allow_html=True)
-        st.markdown("<div class='field-label' style='text-align:center;'>Condition for this Batch</div>", unsafe_allow_html=True)
-        fa, fb = st.columns(2)
-        with fa:
-            if st.button("✓  Used" if st.session_state.file_condition=="used" else "Used", use_container_width=True, key="file_cond_used", type="primary" if st.session_state.file_condition=="used" else "secondary"):
-                st.session_state.file_condition = "used"; st.rerun()
-        with fb:
-            if st.button("✓  New" if st.session_state.file_condition=="new" else "New", use_container_width=True, key="file_cond_new", type="primary" if st.session_state.file_condition=="new" else "secondary"):
-                st.session_state.file_condition = "new"; st.rerun()
-        st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
-        if st.button("🚀  Start Upload Batch", use_container_width=True, type="primary", key="start_file_batch"):
-            st.session_state.file_batch_id = str(uuid.uuid4())
-            st.session_state.file_items = []; st.session_state.file_group_id = None; st.session_state.file_qty = 1; st.rerun()
-    else:
-        total_f = len(st.session_state.file_items)
-        fcond_clr = "#22c55e" if st.session_state.file_condition=="new" else "#7c3aed"
-        st.markdown(f"""
-        <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid {fcond_clr};
-        border-radius:10px; padding:0.65rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
-            <div>
-                <span style='color:#111827; font-size:0.9rem; font-weight:600;'>Upload Batch</span>
-                <span style='color:#4a4a5a; font-size:0.72rem; margin-left:10px;'>
-                    {total_f} items · <span style='color:{fcond_clr};'>{st.session_state.file_condition.title()}</span>
-                </span>
+        <div style='text-align:center; padding:1.5rem 0 1rem;'>
+            <div style='font-size:2.5rem; margin-bottom:0.4rem;'>📸</div>
+            <div style='color:#0f172a; font-size:1.1rem; font-weight:700;'>Batch Upload</div>
+            <div style='color:#64748b; font-size:0.82rem; margin-top:0.3rem;'>
+                Tap <b>Take Photo</b> or select from library. Repeat for each item.
             </div>
         </div>""", unsafe_allow_html=True)
 
-        if st.session_state.file_group_id is None:
-            if st.session_state.file_items:
-                st.markdown("<div class='section-label'>Items uploaded</div>", unsafe_allow_html=True)
+        # Condition — prominent toggle
+        st.markdown("<div class='field-label' style='text-align:center; margin-bottom:6px;'>All items in this batch are:</div>", unsafe_allow_html=True)
+        ca, cb = st.columns(2)
+        with ca:
+            if st.button(
+                "✓  Used" if st.session_state.file_condition=="used" else "Used",
+                use_container_width=True, key="file_cond_used",
+                type="primary" if st.session_state.file_condition=="used" else "secondary"
+            ):
+                st.session_state.file_condition = "used"; st.rerun()
+        with cb:
+            if st.button(
+                "✓  New" if st.session_state.file_condition=="new" else "New",
+                use_container_width=True, key="file_cond_new",
+                type="primary" if st.session_state.file_condition=="new" else "secondary"
+            ):
+                st.session_state.file_condition = "new"; st.rerun()
+
+        st.markdown("<div style='height:0.75rem;'></div>", unsafe_allow_html=True)
+
+        # Big start button
+        if st.button("🚀  Start Scanning", use_container_width=True, type="primary", key="start_file_batch"):
+            st.session_state.file_batch_id = str(uuid.uuid4())
+            st.session_state.file_items    = []
+            st.session_state.file_qty      = 1
+            # Auto-create first item group immediately
+            st.session_state.file_group_id = create_file_group()
+            st.rerun()
+
+    # ── ACTIVE BATCH ──────────────────────────────────────────────
+    else:
+        total_f   = len(st.session_state.file_items)
+        cond_clr  = "#22c55e" if st.session_state.file_condition=="new" else "#0891b2"
+
+        # Mini status bar
+        col_status, col_end = st.columns([4, 1])
+        with col_status:
+            st.markdown(f"""
+            <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid {cond_clr};
+            border-radius:8px; padding:0.5rem 0.85rem; margin-bottom:0.6rem;'>
+                <span style='color:#0f172a; font-size:0.85rem; font-weight:600;'>
+                    {st.session_state.file_condition.title()} Batch
+                </span>
+                <span style='color:#64748b; font-size:0.75rem; margin-left:8px;'>
+                    {total_f} item{"s" if total_f != 1 else ""} scanned
+                </span>
+            </div>""", unsafe_allow_html=True)
+        with col_end:
+            if st.button("🏁 End", use_container_width=True, type="secondary", key="file_end_batch"):
+                st.session_state.file_batch_id = None
+                st.session_state.file_items    = []
+                st.session_state.file_group_id = None
+                st.cache_data.clear(); st.rerun()
+
+        # Previous items (collapsed, just count)
+        if st.session_state.file_items:
+            with st.expander(f"✅  {total_f} item{'s' if total_f != 1 else ''} sent to scanner", expanded=False):
                 for i, item in enumerate(reversed(st.session_state.file_items)):
-                    idx = total_f - i
-                    st.markdown(f"""<div class='batch-card processing'>
-                        <div style='display:flex; justify-content:space-between; align-items:center;'>
-                            <div><span style='color:#0f172a; font-size:0.82rem; font-weight:500;'>Item {idx}</span>
-                            <span style='color:#4a4a5a; font-size:0.7rem; margin-left:8px;'>{item.get("photo_count",0)} photos · Qty {item.get("qty",1)}</span></div>
-                            <span class='status-pill pill-processing'>Processing...</span>
-                        </div></div>""", unsafe_allow_html=True)
-                st.divider()
-            fb1, fb2, fb3 = st.columns([2,2,1])
-            with fb1:
-                if st.button("📁  Add Next Item", use_container_width=True, type="primary"):
-                    result = supabase.table("listing_groups").insert({"session_id":st.session_state.file_batch_id,"status":"waiting","quantity":1,"condition":st.session_state.file_condition}).execute()
-                    st.session_state.file_group_id = result.data[0]["id"]; st.session_state.file_qty = 1; st.rerun()
-            with fb2:
-                if st.button("🏁  End Batch", use_container_width=True, type="secondary"):
-                    st.session_state.file_batch_id = None; st.session_state.file_items = []
-                    st.session_state.file_group_id = None; st.cache_data.clear(); st.rerun()
-            with fb3:
-                if st.button("✗  Cancel", use_container_width=True, type="secondary"):
-                    st.session_state.file_batch_id = None; st.session_state.file_items = []
-                    st.session_state.file_group_id = None; st.rerun()
-        else:
+                    st.markdown(
+                        f"<div style='color:#64748b; font-size:0.78rem; padding:2px 0;'>"
+                        f"Item {total_f-i} · {item.get('photo_count',0)} photos · Qty {item.get('qty',1)}</div>",
+                        unsafe_allow_html=True)
+
+        # ── CURRENT ITEM ─────────────────────────────────────────
+        if st.session_state.file_group_id:
             item_num = total_f + 1
             st.markdown(f"""
-            <div style='background:#faf5ff; border:1.5px solid #7c3aed; border-radius:12px;
-            padding:0.75rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
-                <span style='color:#111827; font-size:0.9rem; font-weight:600;'>Item {item_num}</span>
-                <span class='status-pill pill-active'>Select Photos</span>
+            <div style='background:#eff6ff; border:1.5px solid #0891b2; border-radius:10px;
+            padding:0.6rem 0.9rem; margin-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;'>
+                <span style='color:#0f172a; font-size:0.9rem; font-weight:700;'>Item {item_num}</span>
+                <span style='color:#0891b2; font-size:0.75rem; font-weight:500;'>Take or upload photos below</span>
             </div>""", unsafe_allow_html=True)
-            uploaded_files = st.file_uploader("Select photos (up to 10)", type=["jpg","jpeg","png","heic"], accept_multiple_files=True, key=f"fup_{st.session_state.file_group_id}", label_visibility="collapsed")
+
+            # File uploader — this is the MAIN action, always visible
+            uploaded_files = st.file_uploader(
+                "Tap to take photo or select from library",
+                type=["jpg","jpeg","png","heic"],
+                accept_multiple_files=True,
+                key=f"fup_{st.session_state.file_group_id}",
+                label_visibility="collapsed"
+            )
             if uploaded_files and len(uploaded_files) > 10:
-                st.warning("Maximum 10 photos."); uploaded_files = uploaded_files[:10]
+                st.warning("Max 10 photos — using first 10.")
+                uploaded_files = uploaded_files[:10]
+
+            # Thumbnails
             if uploaded_files:
-                st.markdown(f"<div style='color:#7c3aed; font-size:0.75rem; margin-bottom:6px;'>{len(uploaded_files)} photo(s) selected</div>", unsafe_allow_html=True)
-                tc = st.columns(min(len(uploaded_files),5))
-                for col, f in zip(tc, uploaded_files):
+                st.markdown(
+                    f"<div style='color:#0891b2; font-size:0.75rem; font-weight:600; margin:4px 0;'>"
+                    f"📷 {len(uploaded_files)} photo(s) ready</div>",
+                    unsafe_allow_html=True)
+                thumb_cols = st.columns(min(len(uploaded_files), 5))
+                for col, f in zip(thumb_cols, uploaded_files):
                     with col: st.image(f, use_container_width=True)
-            st.markdown("<div class='field-label' style='margin-top:0.75rem;'>Quantity</div>", unsafe_allow_html=True)
-            fq1,fq2,fq3 = st.columns([1,2,1])
-            with fq1:
+
+            # Quantity — compact stepper
+            st.markdown("<div class='field-label' style='margin-top:0.6rem;'>How many of this item?</div>", unsafe_allow_html=True)
+            q1, q2, q3 = st.columns([1, 2, 1])
+            with q1:
                 if st.button("−", key="fq_minus", use_container_width=True):
                     if st.session_state.file_qty > 1: st.session_state.file_qty -= 1; st.rerun()
-            with fq2:
-                st.markdown(f"<div style='text-align:center; font-size:1.3rem; font-weight:700; color:#fff; padding-top:3px;'>{st.session_state.file_qty}</div>", unsafe_allow_html=True)
-            with fq3:
+            with q2:
+                st.markdown(
+                    f"<div style='text-align:center; font-size:1.5rem; font-weight:700; color:#0f172a; padding-top:2px;'>"
+                    f"{st.session_state.file_qty}</div>", unsafe_allow_html=True)
+            with q3:
                 if st.button("+", key="fq_plus", use_container_width=True):
                     st.session_state.file_qty += 1; st.rerun()
-            fc1, fc2 = st.columns([3,1])
-            with fc1:
-                done_dis = not uploaded_files
-                if st.button("✓  Done — Send to Scanner" if not done_dis else "Select photos to continue", use_container_width=True, type="primary", disabled=done_dis):
-                    with st.spinner("Uploading..."):
-                        group_id = st.session_state.file_group_id; upped = 0
-                        for i, f in enumerate(uploaded_files[:10]):
-                            try: file_upload_photo(f.read(), group_id, i); upped += 1
-                            except Exception as e: st.error(f"Photo {i+1} failed: {e}")
-                        supabase.table("listing_groups").update({"condition":st.session_state.file_condition,"quantity":st.session_state.file_qty,"status":"pending"}).eq("id",group_id).execute()
-                        st.session_state.file_items.append({"group_id":group_id,"condition":st.session_state.file_condition,"qty":st.session_state.file_qty,"status":"pending","photo_count":upped})
-                        st.session_state.file_group_id = None; st.session_state.file_qty = 1
-                        st.cache_data.clear(); st.rerun()
-            with fc2:
-                if st.button("✗  Cancel Item", use_container_width=True, type="secondary"):
-                    try: supabase.table("listing_groups").delete().eq("id",st.session_state.file_group_id).execute()
-                    except: pass
-                    st.session_state.file_group_id = None; st.session_state.file_qty = 1; st.rerun()
+
+            st.markdown("<div style='height:0.4rem;'></div>", unsafe_allow_html=True)
+
+            # Done button — full width, prominent
+            done_dis = not uploaded_files
+            btn_label = f"✓  Done — Next Item →" if not done_dis else "📷  Select photos above first"
+            if st.button(btn_label, use_container_width=True, type="primary",
+                         disabled=done_dis, key="file_done_btn"):
+                with st.spinner(f"Uploading {len(uploaded_files)} photo(s)..."):
+                    group_id = st.session_state.file_group_id
+                    upped = 0
+                    for i, f in enumerate(uploaded_files[:10]):
+                        try:
+                            file_upload_photo(f.read(), group_id, i)
+                            upped += 1
+                        except Exception as e:
+                            st.error(f"Photo {i+1} failed: {e}")
+                    supabase.table("listing_groups").update({
+                        "condition": st.session_state.file_condition,
+                        "quantity":  st.session_state.file_qty,
+                        "status":    "pending"
+                    }).eq("id", group_id).execute()
+                    st.session_state.file_items.append({
+                        "group_id": group_id, "condition": st.session_state.file_condition,
+                        "qty": st.session_state.file_qty, "status": "pending", "photo_count": upped
+                    })
+                    # Auto-create next item group immediately
+                    st.session_state.file_group_id = create_file_group()
+                    st.session_state.file_qty = 1
+                    st.cache_data.clear(); st.rerun()
+
+            # Cancel this item
+            if st.button("✗  Cancel this item", use_container_width=True,
+                         type="secondary", key="file_cancel_item"):
+                try: supabase.table("listing_groups").delete().eq("id", st.session_state.file_group_id).execute()
+                except: pass
+                st.session_state.file_group_id = None
+                st.session_state.file_qty = 1; st.rerun()
 
 elif st.session_state.active_tab == "dashboard":
 
