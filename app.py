@@ -432,6 +432,9 @@ def submit_to_ebay(item: dict) -> dict:
             headers=headers,
             timeout=20
         )
+        print(f"eBay response status: {resp.status_code}")
+        print(f"eBay response: {resp.text[:500]}")
+
         root = ET.fromstring(resp.text)
         ns   = {"e": "urn:ebay:apis:eBLBaseComponents"}
 
@@ -442,7 +445,9 @@ def submit_to_ebay(item: dict) -> dict:
         else:
             errors = root.findall(".//e:Error", ns)
             msgs   = [e.findtext("e:ShortMessage", namespaces=ns) or "" for e in errors]
-            return {"success": False, "error": " | ".join(msgs) or "Unknown eBay error"}
+            long_msgs = [e.findtext("e:LongMessage", namespaces=ns) or "" for e in errors]
+            full_error = " | ".join(msgs) + " — " + " | ".join(long_msgs)
+            return {"success": False, "error": full_error or f"Ack={ack} — {resp.text[:300]}"}
 
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -975,7 +980,6 @@ elif st.session_state.active_tab == "dashboard":
             for i, (_, row) in enumerate(selected_df.iterrows()):
                 prog.progress((i+1)/len(selected_df), text=f"Submitting: {str(row.get('title',''))[:40]}...")
                 result = submit_to_ebay(row.to_dict())
-                st.write(f"Item {i+1}: {result}")  # debug — remove after testing
                 if result["success"]:
                     supabase.table("listings").update({
                         "ebay_item_id":      result["item_id"],
@@ -991,9 +995,25 @@ elif st.session_state.active_tab == "dashboard":
             success_count = sum(1 for r in results if r["success"])
             if success_count > 0:
                 st.success(f"✅ {success_count} listings submitted to eBay as scheduled drafts. Check Seller Hub under Scheduled Listings.")
+            # Store results in session state so they persist across reruns
+            st.session_state.ebay_last_results = results
             for r in results:
-                if not r["success"]:
+                if r["success"]:
+                    st.success(f"✅ {r['title']} → eBay Item #{r['item_id']}")
+                else:
                     st.error(f"❌ {r['title']}: {r['error']}")
+
+        # Show persistent results from last submission
+        if st.session_state.get("ebay_last_results") and not submit_clicked:
+            st.markdown("<div class='section-label'>Last eBay Submission Results</div>", unsafe_allow_html=True)
+            for r in st.session_state.ebay_last_results:
+                if r["success"]:
+                    st.success(f"✅ {r['title']} → eBay Item #{r['item_id']}")
+                else:
+                    st.error(f"❌ {r['title']}: {r['error']}")
+            if st.button("Clear Results", key="clear_ebay_results"):
+                st.session_state.ebay_last_results = []
+                st.rerun()
 
         st.divider()
         st.markdown("<div class='section-label'>Items</div>", unsafe_allow_html=True)
