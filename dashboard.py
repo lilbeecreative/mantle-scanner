@@ -268,9 +268,9 @@ supabase       = get_supabase()
 SUPABASE_URL    = os.getenv("SUPABASE_URL")
 RESEND_API_KEY  = os.getenv("RESEND_API_KEY", "")
 NOTIFY_EMAIL    = "sebastian@lilbeecreative.com"
-EBAY_APP_ID_ENV = os.getenv("EBAY_APP_ID", "sebastia-Listinga-PRD-364adf036-d86654ba")
-EBAY_DEV_ID     = os.getenv("EBAY_DEV_ID", "533fb968-6cd9-41d3-96ea-bf0c554e5541")
-EBAY_CERT_ID    = os.getenv("EBAY_CERT_ID", "PRD-64adf036ff09-9009-4cd3-a744-0cd4")
+EBAY_APP_ID_ENV = os.getenv("EBAY_APP_ID", "")
+EBAY_DEV_ID     = os.getenv("EBAY_DEV_ID", "")
+EBAY_CERT_ID    = os.getenv("EBAY_CERT_ID", "")
 EBAY_USER_TOKEN = os.getenv("EBAY_USER_TOKEN", "")
 
 ARCHIVE_FILE    = "mantle_archive.csv"
