@@ -121,120 +121,141 @@ st.set_page_config(
 st.markdown("""
 <style>
     #MainMenu, footer, header { visibility: hidden; }
-    .stApp { background-color: #0a0a0c; }
+    .stApp { background-color: #f1f5f9; }
     .block-container { padding: 0 !important; max-width: 100% !important; }
-    hr { border-color: #1e1e28 !important; margin: 1rem 0; }
+    hr { border-color: #e2e8f0 !important; margin: 0.75rem 0; }
 
-    /* Compact inputs */
     [data-testid="stTextInput"] input {
-        background: #141418 !important;
-        border: 1px solid #1e1e28 !important;
-        color: #ffffff !important;
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #0f172a !important;
         border-radius: 6px !important;
-        font-size: 0.8rem !important;
+        font-size: 0.82rem !important;
         padding: 4px 8px !important;
-        height: 32px !important;
+        height: 34px !important;
     }
-    [data-testid="stTextInput"] input:focus { border-color: #2196F3 !important; }
+    [data-testid="stTextInput"] input:focus {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59,130,246,0.1) !important;
+        outline: none !important;
+    }
     [data-testid="stNumberInput"] input {
-        background: #141418 !important;
-        border: 1px solid #1e1e28 !important;
-        color: #ffffff !important;
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #0f172a !important;
         border-radius: 6px !important;
-        font-size: 0.8rem !important;
-        height: 32px !important;
+        font-size: 0.82rem !important;
+        height: 34px !important;
     }
     [data-testid="stSelectbox"] > div > div {
-        background: #141418 !important;
-        border: 1px solid #1e1e28 !important;
-        color: #ffffff !important;
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #0f172a !important;
         border-radius: 6px !important;
-        font-size: 0.8rem !important;
-        min-height: 32px !important;
+        font-size: 0.82rem !important;
+        min-height: 34px !important;
     }
     [data-testid="baseButton-secondary"] {
-        background: #141418 !important;
-        border: 1px solid #1e1e28 !important;
-        color: #ffffff !important;
-        border-radius: 6px !important;
-        font-size: 0.8rem !important;
-        padding: 0.2rem 0.5rem !important;
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #374151 !important;
+        border-radius: 8px !important;
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+    }
+    [data-testid="baseButton-secondary"]:hover {
+        background: #f8fafc !important;
+        border-color: #94a3b8 !important;
     }
     [data-testid="baseButton-primary"] {
-        background: #2196F3 !important;
+        background: #3b82f6 !important;
         border: none !important;
-        border-radius: 6px !important;
+        border-radius: 8px !important;
         color: #ffffff !important;
         font-weight: 600 !important;
-        font-size: 0.8rem !important;
+        font-size: 0.82rem !important;
     }
     [data-testid="stExpander"] {
-        background: #141418 !important;
-        border: 1px solid #1e1e28 !important;
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
         border-radius: 10px !important;
     }
     [data-testid="stAlert"] {
-        background: #1e1218 !important;
-        border: 1px solid #3e1e28 !important;
+        background: #fef2f2 !important;
+        border: 1px solid #fecaca !important;
         border-radius: 8px !important;
-        color: #ffaaaa !important;
+        color: #991b1b !important;
     }
     [data-testid="baseButton-download"] {
-        background: #141418 !important;
-        border: 1px solid #1e1e28 !important;
-        color: #6b8fb5 !important;
-        border-radius: 6px !important;
-        font-size: 0.8rem !important;
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #2563eb !important;
+        border-radius: 8px !important;
+        font-size: 0.82rem !important;
     }
     [data-testid="stFileUploader"] {
-        background: #141418 !important;
-        border: 1.5px dashed #2196F3 !important;
+        background: #ffffff !important;
+        border: 2px dashed #93c5fd !important;
         border-radius: 10px !important;
     }
+    [data-testid="stCameraInput"] {
+        border-radius: 12px !important;
+        overflow: hidden;
+    }
+
+    /* Tab color coding */
+    .tab-dashboard [data-testid="baseButton-primary"] { background: #2563eb !important; }
+    .tab-camera    [data-testid="baseButton-primary"] { background: #ea580c !important; }
+    .tab-batch     [data-testid="baseButton-primary"] { background: #0891b2 !important; }
+    .tab-research  [data-testid="baseButton-primary"] { background: #7c3aed !important; }
+    .tab-auction   [data-testid="baseButton-primary"] { background: #b45309 !important; }
+
     .field-label {
-        color: #4a4a5a;
-        font-size: 0.62rem;
+        color: #64748b;
+        font-size: 0.65rem;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
-        margin-bottom: 2px;
-        font-weight: 500;
+        letter-spacing: 0.08em;
+        margin-bottom: 3px;
+        font-weight: 600;
     }
     .batch-card {
-        background: #141418;
-        border: 1.5px solid #1e1e28;
-        border-radius: 12px;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0.65rem 0.9rem;
+        margin-bottom: 0.4rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
     }
-    .batch-card.active { border-color: #2196F3; }
-    .batch-card.processing { border-color: #f59e0b; }
-    .batch-card.done { border-color: #22c55e; }
+    .batch-card.active { border-left: 4px solid #ea580c; background: #fff7ed; }
+    .batch-card.processing { border-left: 4px solid #d97706; background: #fffbeb; }
+    .batch-card.done { border-left: 4px solid #16a34a; background: #f0fdf4; }
     .status-pill {
         display: inline-block;
-        padding: 1px 8px;
+        padding: 2px 9px;
         border-radius: 20px;
         font-size: 0.62rem;
-        font-weight: 500;
+        font-weight: 600;
+        letter-spacing: 0.03em;
     }
-    .pill-active { background: #0a1e3a; color: #2196F3; }
-    .pill-processing { background: #1e1608; color: #f59e0b; }
-    .pill-done { background: #0a1e10; color: #22c55e; }
+    .pill-active { background: #fed7aa; color: #9a3412; }
+    .pill-processing { background: #fde68a; color: #92400e; }
+    .pill-done { background: #bbf7d0; color: #166534; }
     .section-label {
-        color: #4a4a5a;
+        color: #94a3b8;
         font-size: 0.62rem;
         text-transform: uppercase;
         letter-spacing: 0.1em;
-        font-weight: 500;
-        margin-bottom: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 0.6rem;
     }
-    .page-content { padding: 1rem 1.5rem; max-width: 1400px; margin: 0 auto; }
-
-    /* Item card */
-    .item-card {
-        background: #141418;
-        border-radius: 12px;
-        padding: 0.75rem;
-        margin-bottom: 0.5rem;
+    .page-content { padding: 0.85rem 1.5rem; max-width: 1400px; margin: 0 auto; }
+    .mode-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 1.5rem 1rem;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -392,243 +413,324 @@ def fetch_issues():
     return df
 
 # ------------------------------------------------------------------ #
-#  NAV BAR
+#  TOOLBAR
 # ------------------------------------------------------------------ #
 
+df_top = fetch_listings()
+
+# Logo bar
 st.markdown("""
-<div style='background:#0f0f13; border-bottom:1px solid #1e1e28; padding:0 1.5rem;
-display:flex; align-items:center; justify-content:space-between; height:48px;'>
-    <div style='color:#ffffff; font-size:1rem; font-weight:700; letter-spacing:-0.02em;
+<div style='background:#ffffff; border-bottom:1px solid #e2e8f0; padding:0 1.5rem;
+display:flex; align-items:center; justify-content:space-between; height:50px;
+box-shadow: 0 1px 4px rgba(0,0,0,0.06);'>
+    <div style='color:#0f172a; font-size:1rem; font-weight:700; letter-spacing:-0.02em;
     display:flex; align-items:center; gap:8px;'>
-        <div style='width:7px; height:7px; background:#2196F3; border-radius:50%;'></div>
+        <div style='width:8px; height:8px; background:#2563eb; border-radius:50%;'></div>
         Lister AI
     </div>
-    <div style='color:#4a4a5a; font-size:0.7rem;'>Current batch</div>
+    <div style='color:#94a3b8; font-size:0.68rem; letter-spacing:0.08em; font-weight:500;'>EMPLOYEE DASHBOARD</div>
 </div>
 """, unsafe_allow_html=True)
 
-# Row 1: Nav tabs
-n1, n2, n3, n4 = st.columns(4)
-with n1:
-    if st.button("📊  Dashboard", use_container_width=True,
+# Color-coded nav toolbar — separated from page content
+st.markdown("<div style='background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:4px 8px; display:flex; gap:4px;'>", unsafe_allow_html=True)
+t1, t2, t3, t4, t5, t6 = st.columns([2, 1.5, 1.5, 1.5, 1.5, 1.5])
+with t1:
+    st.markdown("<div class='tab-dashboard'>", unsafe_allow_html=True)
+    if st.button("📊  Batch Dashboard", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "dashboard" else "secondary"):
         st.session_state.active_tab = "dashboard"
         st.rerun()
-with n2:
-    if st.button("📷  Batch Upload", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "batch" else "secondary"):
-        st.session_state.active_tab = "batch"
-        st.rerun()
-with n3:
-    if st.button("🔍  Research", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "research" else "secondary"):
-        st.session_state.active_tab = "research"
-        st.rerun()
-with n4:
-    if st.button("↺  Refresh", use_container_width=True, type="secondary"):
-        st.cache_data.clear()
-        st.rerun()
-
-# Row 2: Downloads + Clear
-df_top = fetch_listings()
-d1, d2, d3 = st.columns(3)
-with d1:
-    if not df_top.empty:
-        csv_df = df_top.copy()
-        if "created_at" in csv_df.columns:
-            csv_df["created_at"] = csv_df["created_at"].astype(str)
-        st.download_button(
-            label="⬇️  Raw CSV",
-            data=csv_df.to_csv(index=False).encode("utf-8"),
-            file_name="listerai_inventory.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    else:
-        st.button("⬇️  Raw CSV", use_container_width=True, disabled=True)
-with d2:
-    if not df_top.empty:
-        st.download_button(
-            label="🛒  eBay CSV",
-            data=build_ebay_csv(df_top),
-            file_name=f"listerai_ebay_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-    else:
-        st.button("🛒  eBay CSV", use_container_width=True, disabled=True)
-with d3:
-    if st.button("🗑️  Clear Batch", use_container_width=True, type="secondary",
-                 disabled=df_top.empty):
-        st.session_state.confirm_clear = True
-        st.rerun()
-
-st.markdown("<div class='page-content'>", unsafe_allow_html=True)
-
 # ================================================================== #
-#  TAB: BATCH UPLOAD
+#  TAB: CAMERA SCAN
 # ================================================================== #
 
-if st.session_state.active_tab == "batch":
+if st.session_state.active_tab == "camera":
 
-    st.markdown("<div class='section-label'>Batch Upload</div>", unsafe_allow_html=True)
+    from PIL import Image, ExifTags
+    import io as _io
 
-    if "upload_session_id" not in st.session_state:
-        st.session_state.upload_session_id = str(uuid.uuid4())
-    if "batch_items" not in st.session_state:
-        st.session_state.batch_items = []
-    if "current_group_id" not in st.session_state:
-        st.session_state.current_group_id = None
-
-    total_batch   = len(st.session_state.batch_items)
-    done_batch    = sum(1 for i in st.session_state.batch_items if i["status"] == "done")
-    pending_batch = sum(1 for i in st.session_state.batch_items if i["status"] == "pending")
-    total_photos  = sum(i.get("photo_count", 0) for i in st.session_state.batch_items)
-
-    sc1, sc2, sc3, sc4 = st.columns(4)
-    for col, val, label, color in [
-        (sc1, total_batch,   "Items",      "#2196F3"),
-        (sc2, pending_batch, "Processing", "#f59e0b"),
-        (sc3, done_batch,    "Listed",     "#22c55e"),
-        (sc4, total_photos,  "Photos",     "#a855f7"),
-    ]:
-        with col:
-            st.markdown(f"""
-            <div style='background:#141418; border:1px solid #1e1e28; border-top:2px solid {color};
-            border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.75rem;'>
-                <div style='color:#ffffff; font-size:1.6rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{val}</div>
-                <div style='color:#4a4a5a; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>{label}</div>
-            </div>""", unsafe_allow_html=True)
-
-    st.divider()
-
-    if st.session_state.current_group_id is None:
-        st.markdown("""
-        <div style='text-align:center; padding:2rem 0;'>
-            <div style='font-size:1.8rem; margin-bottom:0.75rem;'>📦</div>
-            <div style='color:#aaaacc; font-size:0.95rem; font-weight:500;'>Ready to scan</div>
-            <div style='color:#4a4a5a; font-size:0.8rem; margin-top:0.4rem;'>Click New Item to start uploading photos</div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        current_item_index = len(st.session_state.batch_items) + 1
-        st.markdown(f"""
-        <div class='batch-card active'>
-            <div style='display:flex; justify-content:space-between; align-items:center;'>
-                <span style='color:#ffffff; font-size:0.85rem; font-weight:500;'>Item {current_item_index}</span>
-                <span class='status-pill pill-active'>In progress</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("<div class='field-label'>Upload photos (up to 10)</div>", unsafe_allow_html=True)
-        uploaded_files = st.file_uploader(
-            "Upload photos", type=["jpg", "jpeg", "png", "heic"],
-            accept_multiple_files=True,
-            key=f"uploader_{st.session_state.current_group_id}",
-            label_visibility="collapsed"
-        )
-
-        if uploaded_files and len(uploaded_files) > 10:
-            st.warning("Maximum 10 photos. Only the first 10 will be used.")
-            uploaded_files = uploaded_files[:10]
-
-        if uploaded_files:
-            st.markdown(
-                f"<div style='color:#2196F3; font-size:0.75rem; margin-bottom:6px;'>"
-                f"{len(uploaded_files)} photo(s) selected</div>", unsafe_allow_html=True
-            )
-            thumb_cols = st.columns(min(len(uploaded_files), 10))
-            for col, f in zip(thumb_cols, uploaded_files):
-                with col:
-                    st.image(f, use_container_width=True)
-
-        cond_col, qty_col = st.columns(2)
-        with cond_col:
-            st.markdown("<div class='field-label'>Condition</div>", unsafe_allow_html=True)
-            item_condition = st.selectbox("Condition", ["used", "new"],
-                key=f"item_cond_{st.session_state.current_group_id}", label_visibility="collapsed")
-        with qty_col:
-            st.markdown("<div class='field-label'>Quantity</div>", unsafe_allow_html=True)
-            item_qty = st.number_input("Quantity", min_value=1, value=1, step=1,
-                key=f"item_qty_{st.session_state.current_group_id}", label_visibility="collapsed")
-
-        btn_col1, btn_col2 = st.columns([3, 1])
-        with btn_col2:
-            if st.button("Done →", use_container_width=True, type="primary", disabled=not uploaded_files):
-                with st.spinner("Uploading..."):
-                    group_id    = st.session_state.current_group_id
-                    photo_count = 0
-                    for i, f in enumerate(uploaded_files[:10]):
-                        try:
-                            dt        = datetime.now()
-                            filename  = f"{dt.strftime('%d%m%y')}_{dt.strftime('%H%M%S')}_{i}{os.path.splitext(f.name)[1].lower() or '.jpg'}"
-                            supabase.storage.from_("part-photos").upload(
-                                path=filename, file=f.read(),
-                                file_options={"content-type": f.type or "image/jpeg", "upsert": "true"}
-                            )
-                            supabase.table("group_photos").insert({"group_id": group_id, "photo_id": filename}).execute()
-                            photo_count += 1
-                        except Exception as e:
-                            st.error(f"Upload failed: {e}")
-
-                    supabase.table("listing_groups").update({
-                        "condition": item_condition, "quantity": item_qty, "status": "pending",
-                    }).eq("id", group_id).execute()
-
-                    st.session_state.batch_items.append({
-                        "group_id": group_id, "condition": item_condition,
-                        "qty": item_qty, "status": "pending", "photo_count": photo_count,
-                    })
-                    st.session_state.current_group_id = None
-                    st.cache_data.clear()
-                    st.rerun()
-
-    if st.button("📦  New Item", use_container_width=True, type="secondary",
-                 disabled=st.session_state.current_group_id is not None):
+    def fix_rotation(img_bytes):
         try:
+            img = Image.open(_io.BytesIO(img_bytes))
+            exif = img._getexif()
+            if exif:
+                ok = next((k for k, v in ExifTags.TAGS.items() if v == "Orientation"), None)
+                if ok and ok in exif:
+                    rot = {3:180, 6:270, 8:90}.get(exif[ok])
+                    if rot:
+                        img = img.rotate(rot, expand=True)
+            buf = _io.BytesIO()
+            img.save(buf, format="JPEG", quality=90)
+            return buf.getvalue()
+        except Exception:
+            return img_bytes
+
+    def cam_upload(img_bytes, group_id, idx):
+        fixed = fix_rotation(img_bytes)
+        dt = datetime.now()
+        fn = f"{dt.strftime('%d%m%y')}_{dt.strftime('%H%M%S')}_{idx}.jpg"
+        supabase.storage.from_("part-photos").upload(path=fn, file=fixed, file_options={"content-type":"image/jpeg","upsert":"true"})
+        supabase.table("group_photos").insert({"group_id":group_id,"photo_id":fn}).execute()
+
+    for k,v in [("cam_batch_id",None),("cam_condition","used"),("cam_items",[]),("cam_group_id",None),("cam_photos",[]),("cam_qty",1)]:
+        if k not in st.session_state: st.session_state[k] = v
+
+    if st.session_state.cam_batch_id is None:
+        st.markdown("""
+        <div style='text-align:center; padding:2rem 0 1rem;'>
+            <div style='font-size:2.5rem; margin-bottom:0.5rem;'>📸</div>
+            <div style='color:#111827; font-size:1.1rem; font-weight:600;'>Camera Scan</div>
+            <div style='color:#4a4a5a; font-size:0.82rem; margin-top:0.3rem;'>Take up to 10 photos per item</div>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<div class='field-label' style='text-align:center;'>Condition for this Batch</div>", unsafe_allow_html=True)
+        ca, cb = st.columns(2)
+        with ca:
+            if st.button("✓  Used" if st.session_state.cam_condition=="used" else "Used", use_container_width=True, key="cam_cond_used", type="primary" if st.session_state.cam_condition=="used" else "secondary"):
+                st.session_state.cam_condition = "used"; st.rerun()
+        with cb:
+            if st.button("✓  New" if st.session_state.cam_condition=="new" else "New", use_container_width=True, key="cam_cond_new", type="primary" if st.session_state.cam_condition=="new" else "secondary"):
+                st.session_state.cam_condition = "new"; st.rerun()
+        st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
+        if st.button("🚀  Start Camera Batch", use_container_width=True, type="primary", key="start_cam_batch"):
+            batch_id = str(uuid.uuid4())
+            st.session_state.cam_batch_id = batch_id
+            st.session_state.cam_items    = []
+            st.session_state.cam_photos   = []
+            st.session_state.cam_qty      = 1
+            # Auto-create first item group so camera opens immediately
             result = supabase.table("listing_groups").insert({
-                "session_id": st.session_state.upload_session_id,
-                "status": "waiting", "quantity": 1, "condition": "used",
+                "session_id": batch_id,
+                "status":     "waiting",
+                "quantity":   1,
+                "condition":  st.session_state.cam_condition,
             }).execute()
-            st.session_state.current_group_id = result.data[0]["id"]
+            st.session_state.cam_group_id = result.data[0]["id"]
             st.rerun()
-        except Exception as e:
-            st.error(f"Failed: {e}")
-
-    if st.session_state.batch_items:
-        st.divider()
-        st.markdown("<div class='section-label'>This session</div>", unsafe_allow_html=True)
-        for i, item in enumerate(reversed(st.session_state.batch_items)):
-            status     = item.get("status", "pending")
-            pill_class = {"pending": "pill-processing", "done": "pill-done"}.get(status, "pill-active")
-            pill_label = {"pending": "Processing...", "done": "Listed"}.get(status, status.title())
-            card_class = {"pending": "processing", "done": "done"}.get(status, "")
-            st.markdown(f"""
-            <div class='batch-card {card_class}'>
-                <div style='display:flex; justify-content:space-between; align-items:center;'>
-                    <div>
-                        <span style='color:#ffffff; font-size:0.82rem; font-weight:500;'>Item {len(st.session_state.batch_items) - i}</span>
-                        <span style='color:#4a4a5a; font-size:0.7rem; margin-left:8px;'>
-                            {item.get("photo_count",0)} photos &nbsp;·&nbsp; {item.get("condition","used").title()} &nbsp;·&nbsp; Qty: {item.get("qty",1)}
-                        </span>
-                    </div>
-                    <span class='status-pill {pill_class}'>{pill_label}</span>
-                </div>
+    else:
+        total_cam = len(st.session_state.cam_items)
+        cond_color = "#22c55e" if st.session_state.cam_condition=="new" else "#2196F3"
+        st.markdown(f"""
+        <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid {cond_color};
+        border-radius:10px; padding:0.65rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
+            <div>
+                <span style='color:#111827; font-size:0.9rem; font-weight:600;'>Camera Batch</span>
+                <span style='color:#4a4a5a; font-size:0.72rem; margin-left:10px;'>
+                    {total_cam} items · <span style='color:{cond_color};'>{st.session_state.cam_condition.title()}</span>
+                </span>
             </div>
-            """, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
 
-    if st.session_state.batch_items and st.session_state.current_group_id is None:
-        st.divider()
-        if st.button("🔄  New Session", use_container_width=True, type="secondary"):
-            st.session_state.upload_session_id = str(uuid.uuid4())
-            st.session_state.batch_items       = []
-            st.session_state.current_group_id  = None
-            st.rerun()
+        if st.session_state.cam_group_id is None:
+            if st.session_state.cam_items:
+                st.markdown("<div class='section-label'>Items scanned</div>", unsafe_allow_html=True)
+                for i, item in enumerate(reversed(st.session_state.cam_items)):
+                    idx = total_cam - i
+                    st.markdown(f"""<div class='batch-card processing'>
+                        <div style='display:flex; justify-content:space-between; align-items:center;'>
+                            <div><span style='color:#0f172a; font-size:0.82rem; font-weight:500;'>Item {idx}</span>
+                            <span style='color:#4a4a5a; font-size:0.7rem; margin-left:8px;'>{item.get("photo_count",0)} photos · Qty {item.get("qty",1)}</span></div>
+                            <span class='status-pill pill-processing'>Processing...</span>
+                        </div></div>""", unsafe_allow_html=True)
+                st.divider()
+            b1, b2, b3 = st.columns([2,2,1])
+            with b1:
+                if st.button("📸  Scan Next Item", use_container_width=True, type="primary"):
+                    result = supabase.table("listing_groups").insert({"session_id":st.session_state.cam_batch_id,"status":"waiting","quantity":1,"condition":st.session_state.cam_condition}).execute()
+                    st.session_state.cam_group_id = result.data[0]["id"]
+                    st.session_state.cam_photos = []; st.session_state.cam_qty = 1; st.rerun()
+            with b2:
+                if st.button("🏁  End Batch", use_container_width=True, type="secondary"):
+                    st.session_state.cam_batch_id = None; st.session_state.cam_items = []
+                    st.session_state.cam_group_id = None; st.session_state.cam_photos = []
+                    st.cache_data.clear(); st.rerun()
+            with b3:
+                if st.button("✗  Cancel", use_container_width=True, type="secondary"):
+                    st.session_state.cam_batch_id = None; st.session_state.cam_items = []
+                    st.session_state.cam_group_id = None; st.session_state.cam_photos = []; st.rerun()
+        else:
+            item_num = total_cam + 1
+            photo_count = len(st.session_state.cam_photos)
+            remaining = 10 - photo_count
+            st.markdown(f"""
+            <div style='background:#eff6ff; border:1.5px solid #3b82f6; border-radius:12px;
+            padding:0.75rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
+                <span style='color:#111827; font-size:0.9rem; font-weight:600;'>Item {item_num}</span>
+                <span style='color:#60b4ff; font-size:0.82rem; font-weight:500;'>{photo_count}/10 photos</span>
+            </div>""", unsafe_allow_html=True)
+            if st.session_state.cam_photos:
+                tc = st.columns(min(len(st.session_state.cam_photos),5))
+                for col, pb in zip(tc, st.session_state.cam_photos):
+                    with col: st.image(pb, use_container_width=True)
+            if remaining > 0:
+                st.markdown(f"<div style='color:#4a4a5a; font-size:0.72rem; margin-bottom:4px;'>Photo {photo_count+1} of up to 10</div>", unsafe_allow_html=True)
+                cam_img = st.camera_input("Take photo", label_visibility="collapsed", key=f"cam_{st.session_state.cam_group_id}_{photo_count}")
+                if cam_img:
+                    st.session_state.cam_photos.append(cam_img.read()); st.rerun()
+            else:
+                st.success("Maximum 10 photos — tap Done to process.")
+            st.markdown("<div class='field-label' style='margin-top:0.75rem;'>Quantity</div>", unsafe_allow_html=True)
+            qq1,qq2,qq3 = st.columns([1,2,1])
+            with qq1:
+                if st.button("−", key="cam_minus", use_container_width=True):
+                    if st.session_state.cam_qty > 1: st.session_state.cam_qty -= 1; st.rerun()
+            with qq2:
+                st.markdown(f"<div style='text-align:center; font-size:1.3rem; font-weight:700; color:#fff; padding-top:3px;'>{st.session_state.cam_qty}</div>", unsafe_allow_html=True)
+            with qq3:
+                if st.button("+", key="cam_plus", use_container_width=True):
+                    st.session_state.cam_qty += 1; st.rerun()
+            da, db = st.columns([3,1])
+            with da:
+                done_disabled = len(st.session_state.cam_photos) == 0
+                if st.button("✓  Done — Send to Scanner" if not done_disabled else "Take at least one photo", use_container_width=True, type="primary", disabled=done_disabled):
+                    with st.spinner("Uploading..."):
+                        group_id = st.session_state.cam_group_id; uploaded = 0
+                        for i, pb in enumerate(st.session_state.cam_photos):
+                            try: cam_upload(pb, group_id, i); uploaded += 1
+                            except Exception as e: st.error(f"Photo {i+1} failed: {e}")
+                        supabase.table("listing_groups").update({"condition":st.session_state.cam_condition,"quantity":st.session_state.cam_qty,"status":"pending"}).eq("id",group_id).execute()
+                        st.session_state.cam_items.append({"group_id":group_id,"condition":st.session_state.cam_condition,"qty":st.session_state.cam_qty,"status":"pending","photo_count":uploaded})
+                        st.session_state.cam_group_id = None; st.session_state.cam_photos = []; st.session_state.cam_qty = 1
+                        st.cache_data.clear(); st.rerun()
+            with db:
+                if st.button("✗  Cancel Item", use_container_width=True, type="secondary"):
+                    try: supabase.table("listing_groups").delete().eq("id",st.session_state.cam_group_id).execute()
+                    except: pass
+                    st.session_state.cam_group_id = None; st.session_state.cam_photos = []; st.session_state.cam_qty = 1; st.rerun()
 
 # ================================================================== #
-#  TAB: DASHBOARD
+#  TAB: FILE UPLOAD
 # ================================================================== #
+
+elif st.session_state.active_tab == "batch":
+
+    from PIL import Image, ExifTags
+    import io as _io
+
+    def fix_rot_b(img_bytes):
+        try:
+            img = Image.open(_io.BytesIO(img_bytes))
+            exif = img._getexif()
+            if exif:
+                ok = next((k for k, v in ExifTags.TAGS.items() if v == "Orientation"), None)
+                if ok and ok in exif:
+                    rot = {3:180,6:270,8:90}.get(exif[ok])
+                    if rot: img = img.rotate(rot, expand=True)
+            buf = _io.BytesIO(); img.save(buf, format="JPEG", quality=90); return buf.getvalue()
+        except: return img_bytes
+
+    def file_upload_photo(f_bytes, group_id, idx):
+        fixed = fix_rot_b(f_bytes)
+        dt = datetime.now()
+        fn = f"{dt.strftime('%d%m%y')}_{dt.strftime('%H%M%S')}_{idx}.jpg"
+        supabase.storage.from_("part-photos").upload(path=fn, file=fixed, file_options={"content-type":"image/jpeg","upsert":"true"})
+        supabase.table("group_photos").insert({"group_id":group_id,"photo_id":fn}).execute()
+
+    for k,v in [("file_batch_id",None),("file_condition","used"),("file_items",[]),("file_group_id",None),("file_qty",1)]:
+        if k not in st.session_state: st.session_state[k] = v
+
+    if st.session_state.file_batch_id is None:
+        st.markdown("""
+        <div style='text-align:center; padding:2rem 0 1rem;'>
+            <div style='font-size:2.5rem; margin-bottom:0.5rem;'>🗂️</div>
+            <div style='color:#111827; font-size:1.1rem; font-weight:600;'>File Upload</div>
+            <div style='color:#4a4a5a; font-size:0.82rem; margin-top:0.3rem;'>Upload multiple photos per item from your device</div>
+        </div>""", unsafe_allow_html=True)
+        st.markdown("<div class='field-label' style='text-align:center;'>Condition for this Batch</div>", unsafe_allow_html=True)
+        fa, fb = st.columns(2)
+        with fa:
+            if st.button("✓  Used" if st.session_state.file_condition=="used" else "Used", use_container_width=True, key="file_cond_used", type="primary" if st.session_state.file_condition=="used" else "secondary"):
+                st.session_state.file_condition = "used"; st.rerun()
+        with fb:
+            if st.button("✓  New" if st.session_state.file_condition=="new" else "New", use_container_width=True, key="file_cond_new", type="primary" if st.session_state.file_condition=="new" else "secondary"):
+                st.session_state.file_condition = "new"; st.rerun()
+        st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
+        if st.button("🚀  Start Upload Batch", use_container_width=True, type="primary", key="start_file_batch"):
+            st.session_state.file_batch_id = str(uuid.uuid4())
+            st.session_state.file_items = []; st.session_state.file_group_id = None; st.session_state.file_qty = 1; st.rerun()
+    else:
+        total_f = len(st.session_state.file_items)
+        fcond_clr = "#22c55e" if st.session_state.file_condition=="new" else "#7c3aed"
+        st.markdown(f"""
+        <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid {fcond_clr};
+        border-radius:10px; padding:0.65rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
+            <div>
+                <span style='color:#111827; font-size:0.9rem; font-weight:600;'>Upload Batch</span>
+                <span style='color:#4a4a5a; font-size:0.72rem; margin-left:10px;'>
+                    {total_f} items · <span style='color:{fcond_clr};'>{st.session_state.file_condition.title()}</span>
+                </span>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+        if st.session_state.file_group_id is None:
+            if st.session_state.file_items:
+                st.markdown("<div class='section-label'>Items uploaded</div>", unsafe_allow_html=True)
+                for i, item in enumerate(reversed(st.session_state.file_items)):
+                    idx = total_f - i
+                    st.markdown(f"""<div class='batch-card processing'>
+                        <div style='display:flex; justify-content:space-between; align-items:center;'>
+                            <div><span style='color:#0f172a; font-size:0.82rem; font-weight:500;'>Item {idx}</span>
+                            <span style='color:#4a4a5a; font-size:0.7rem; margin-left:8px;'>{item.get("photo_count",0)} photos · Qty {item.get("qty",1)}</span></div>
+                            <span class='status-pill pill-processing'>Processing...</span>
+                        </div></div>""", unsafe_allow_html=True)
+                st.divider()
+            fb1, fb2, fb3 = st.columns([2,2,1])
+            with fb1:
+                if st.button("📁  Add Next Item", use_container_width=True, type="primary"):
+                    result = supabase.table("listing_groups").insert({"session_id":st.session_state.file_batch_id,"status":"waiting","quantity":1,"condition":st.session_state.file_condition}).execute()
+                    st.session_state.file_group_id = result.data[0]["id"]; st.session_state.file_qty = 1; st.rerun()
+            with fb2:
+                if st.button("🏁  End Batch", use_container_width=True, type="secondary"):
+                    st.session_state.file_batch_id = None; st.session_state.file_items = []
+                    st.session_state.file_group_id = None; st.cache_data.clear(); st.rerun()
+            with fb3:
+                if st.button("✗  Cancel", use_container_width=True, type="secondary"):
+                    st.session_state.file_batch_id = None; st.session_state.file_items = []
+                    st.session_state.file_group_id = None; st.rerun()
+        else:
+            item_num = total_f + 1
+            st.markdown(f"""
+            <div style='background:#faf5ff; border:1.5px solid #7c3aed; border-radius:12px;
+            padding:0.75rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
+                <span style='color:#111827; font-size:0.9rem; font-weight:600;'>Item {item_num}</span>
+                <span class='status-pill pill-active'>Select Photos</span>
+            </div>""", unsafe_allow_html=True)
+            uploaded_files = st.file_uploader("Select photos (up to 10)", type=["jpg","jpeg","png","heic"], accept_multiple_files=True, key=f"fup_{st.session_state.file_group_id}", label_visibility="collapsed")
+            if uploaded_files and len(uploaded_files) > 10:
+                st.warning("Maximum 10 photos."); uploaded_files = uploaded_files[:10]
+            if uploaded_files:
+                st.markdown(f"<div style='color:#7c3aed; font-size:0.75rem; margin-bottom:6px;'>{len(uploaded_files)} photo(s) selected</div>", unsafe_allow_html=True)
+                tc = st.columns(min(len(uploaded_files),5))
+                for col, f in zip(tc, uploaded_files):
+                    with col: st.image(f, use_container_width=True)
+            st.markdown("<div class='field-label' style='margin-top:0.75rem;'>Quantity</div>", unsafe_allow_html=True)
+            fq1,fq2,fq3 = st.columns([1,2,1])
+            with fq1:
+                if st.button("−", key="fq_minus", use_container_width=True):
+                    if st.session_state.file_qty > 1: st.session_state.file_qty -= 1; st.rerun()
+            with fq2:
+                st.markdown(f"<div style='text-align:center; font-size:1.3rem; font-weight:700; color:#fff; padding-top:3px;'>{st.session_state.file_qty}</div>", unsafe_allow_html=True)
+            with fq3:
+                if st.button("+", key="fq_plus", use_container_width=True):
+                    st.session_state.file_qty += 1; st.rerun()
+            fc1, fc2 = st.columns([3,1])
+            with fc1:
+                done_dis = not uploaded_files
+                if st.button("✓  Done — Send to Scanner" if not done_dis else "Select photos to continue", use_container_width=True, type="primary", disabled=done_dis):
+                    with st.spinner("Uploading..."):
+                        group_id = st.session_state.file_group_id; upped = 0
+                        for i, f in enumerate(uploaded_files[:10]):
+                            try: file_upload_photo(f.read(), group_id, i); upped += 1
+                            except Exception as e: st.error(f"Photo {i+1} failed: {e}")
+                        supabase.table("listing_groups").update({"condition":st.session_state.file_condition,"quantity":st.session_state.file_qty,"status":"pending"}).eq("id",group_id).execute()
+                        st.session_state.file_items.append({"group_id":group_id,"condition":st.session_state.file_condition,"qty":st.session_state.file_qty,"status":"pending","photo_count":upped})
+                        st.session_state.file_group_id = None; st.session_state.file_qty = 1
+                        st.cache_data.clear(); st.rerun()
+            with fc2:
+                if st.button("✗  Cancel Item", use_container_width=True, type="secondary"):
+                    try: supabase.table("listing_groups").delete().eq("id",st.session_state.file_group_id).execute()
+                    except: pass
+                    st.session_state.file_group_id = None; st.session_state.file_qty = 1; st.rerun()
 
 elif st.session_state.active_tab == "dashboard":
 
@@ -684,10 +786,10 @@ elif st.session_state.active_tab == "dashboard":
             with col:
                 sub_html = f"<div style='color:#6b6b7b; font-size:0.68rem; margin-top:2px;'>{sub}</div>" if sub else ""
                 st.markdown(f"""
-                <div style='background:#141418; border:1px solid #1e1e28; border-top:2px solid {color};
+                <div style='background:#ffffff; border:1px solid #e2e8f0; border-top:3px solid {color};
                 border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:0.75rem;'>
-                    <div style='color:#ffffff; font-size:1.8rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{val}</div>
-                    <div style='color:#4a4a5a; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:5px;'>{label}</div>
+                    <div style='color:#0f172a; font-size:1.8rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{val}</div>
+                    <div style='color:#64748b; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:5px;'>{label}</div>
                     {sub_html}
                 </div>""", unsafe_allow_html=True)
 
@@ -719,7 +821,7 @@ elif st.session_state.active_tab == "dashboard":
             flag_color  = "#f59e0b22" if price_note in ("new", "used") else "#1e1e28"
 
             st.markdown(
-                f"<div style='background:#141418; border:1px solid {flag_color}; "
+                f"<div style='background:#ffffff; border:1px solid {flag_color}; "
                 f"border-radius:12px; padding:0.75rem; margin-bottom:0.5rem;'>",
                 unsafe_allow_html=True
             )
@@ -751,23 +853,30 @@ elif st.session_state.active_tab == "dashboard":
 
                 with pc1:
                     st.markdown("<div class='field-label'>Price</div>", unsafe_allow_html=True)
-                    new_price = st.number_input(
-                        "Price", value=price, step=0.01, format="%.2f",
-                        key=f"price_{item_id}", label_visibility="collapsed"
+                    # Use text_input so there are no +/- spinner buttons
+                    # Key includes price so it re-renders when condition changes
+                    price_key = f"price_{item_id}_{round(price, 2)}"
+                    price_input = st.text_input(
+                        "Price", value=f"{price:.2f}",
+                        key=price_key, label_visibility="collapsed"
                     )
-                    if round(new_price, 2) != round(price, 2):
-                        update_field(item_id, "price", round(new_price, 2))
-                        update_field(item_id, "price_note", "")
-                        st.cache_data.clear()
+                    try:
+                        new_price = round(float(price_input.replace("$","").strip()), 2)
+                        if new_price != round(price, 2):
+                            update_field(item_id, "price", new_price)
+                            update_field(item_id, "price_note", "")
+                            st.cache_data.clear()
+                    except ValueError:
+                        pass
                     if has_dual:
                         p_used_str = f"${price_used:.2f}" if price_used > 0 else "—"
                         p_new_str  = f"${price_new:.2f}"  if price_new  > 0 else "—"
                         st.markdown(
-                            f"<div style='color:#4a4a5a; font-size:0.6rem;'>U:{p_used_str} N:{p_new_str}</div>",
+                            f"<div style='color:#64748b; font-size:0.6rem;'>U:{p_used_str} &nbsp; N:{p_new_str}</div>",
                             unsafe_allow_html=True)
                     if price_note in ("new", "used"):
                         st.markdown(
-                            f"<div style='color:#f59e0b; font-size:0.6rem;'>⚠ fallback to {price_note}</div>",
+                            f"<div style='color:#d97706; font-size:0.6rem;'>⚠ fallback to {price_note}</div>",
                             unsafe_allow_html=True)
 
                 with pc2:
@@ -780,7 +889,7 @@ elif st.session_state.active_tab == "dashboard":
                     if new_cond != condition:
                         price_updated = switch_condition(item_id, new_cond, price_used, price_new)
                         if not price_updated:
-                            st.toast("Condition updated — update price manually for this item", icon="⚠️")
+                            st.toast("Condition updated — update price manually", icon="⚠️")
                         st.cache_data.clear()
                         st.rerun()
 
@@ -797,7 +906,7 @@ elif st.session_state.active_tab == "dashboard":
                     with q2:
                         st.markdown(
                             f"<div style='text-align:center; font-size:0.9rem; font-weight:600; "
-                            f"color:#ffffff; padding-top:5px;'>{current_qty}</div>", unsafe_allow_html=True)
+                            f"color:#111827; padding-top:5px;'>{current_qty}</div>", unsafe_allow_html=True)
                     with q3:
                         if st.button("+", key=f"plus_{item_id}", use_container_width=True):
                             new_qty = current_qty + 1
@@ -866,10 +975,10 @@ elif st.session_state.active_tab == "dashboard":
                 if hasattr(submitted, "strftime"):
                     submitted = submitted.strftime("%b %d %I:%M %p")
                 st.markdown(f"""
-                <div style='background:#141418; border:1px solid #1e1e28; border-radius:8px;
+                <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
                 padding:0.6rem 0.9rem; margin-bottom:0.4rem;'>
                     <div style='color:#4a4a5a; font-size:0.65rem; margin-bottom:3px;'>{submitted}</div>
-                    <div style='color:#ffffff; font-size:0.82rem;'>{desc}</div>
+                    <div style='color:#111827; font-size:0.82rem;'>{desc}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 if st.button("✓ Resolved", key=f"resolve_{issue_id}"):
@@ -949,9 +1058,9 @@ elif st.session_state.active_tab == "research":
         ]:
             with col:
                 st.markdown(f"""
-                <div style='background:#141418; border:1px solid #1e1e28; border-top:2px solid {color};
+                <div style='background:#ffffff; border:1px solid #e2e8f0; border-top:3px solid {color};
                 border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:0.75rem;'>
-                    <div style='color:#ffffff; font-size:1.2rem; font-weight:700; line-height:1;'>{val}</div>
+                    <div style='color:#111827; font-size:1.2rem; font-weight:700; line-height:1;'>{val}</div>
                     <div style='color:#4a4a5a; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:5px;'>{label}</div>
                 </div>""", unsafe_allow_html=True)
 
@@ -1017,9 +1126,9 @@ elif st.session_state.active_tab == "research":
                                 st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:8px; height:120px; display:flex; align-items:center; justify-content:center; color:#4a4a5a;'>📷</div>", unsafe_allow_html=True)
 
                             st.markdown(f"""
-                            <div style='background:#141418; border:1px solid {border_color};
+                            <div style='background:#ffffff; border:1px solid {border_color};
                             border-radius:8px; padding:0.6rem 0.75rem; margin-top:6px; margin-bottom:4px;'>
-                                <div style='color:#ffffff; font-size:0.75rem; font-weight:500;
+                                <div style='color:#111827; font-size:0.75rem; font-weight:500;
                                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
                                 margin-bottom:6px;' title='{ebay_title}'>{ebay_title[:50]}</div>
                                 <div style='color:{price_color}; font-size:1.1rem; font-weight:700;'>${ebay_price:.2f}</div>
@@ -1031,10 +1140,439 @@ elif st.session_state.active_tab == "research":
                             if ebay_url and ebay_url != "nan":
                                 st.markdown(
                                     f"<a href='{ebay_url}' target='_blank' style='display:block; text-align:center; "
-                                    f"background:#1a1a22; border:1px solid #2a2a38; border-radius:6px; padding:5px; "
+                                    f"background:#f0f9ff; border:1px solid #93c5fd; border-radius:6px; padding:5px; "
                                     f"color:#2196F3; font-size:0.72rem; text-decoration:none; margin-bottom:12px;'>"
                                     f"View on eBay ↗</a>",
                                     unsafe_allow_html=True
                                 )
+
+
+
+# ================================================================== #
+#  TAB: AUCTION SCANNER
+# ================================================================== #
+
+elif st.session_state.active_tab == "auction":
+
+    import threading
+    import sys
+    sys.path.insert(0, os.path.dirname(__file__) or ".")
+
+    # State
+    for k, v in [
+        ("auction_session_id", None),
+        ("auction_url", ""),
+        ("auction_items", []),
+        ("auction_scanning", False),
+        ("auction_enriching", False),
+        ("auction_page_mode", "single"),
+        ("auction_page_num", 1),
+        ("auction_auto_enrich", False),
+        ("auction_enrich_ids", []),
+    ]:
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+    # ---- Header ----------------------------------------------------- #
+    st.markdown("""
+    <div style='margin-bottom:1rem;'>
+        <div style='color:#0f172a; font-size:1.1rem; font-weight:700; margin-bottom:2px;'>🔨 Auction Scanner</div>
+        <div style='color:#64748b; font-size:0.8rem;'>
+            Paste any auction URL — the scanner will pull all listings,
+            then look up eBay market values automatically.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ---- URL Input -------------------------------------------------- #
+    col_url, col_scan = st.columns([4, 1])
+    with col_url:
+        auction_url = st.text_input(
+            "Auction URL",
+            value=st.session_state.auction_url,
+            placeholder="https://www.bidspotter.com/auctions/...",
+            label_visibility="collapsed",
+            key="auction_url_input"
+        )
+        st.session_state.auction_url = auction_url
+
+    # Page settings
+    ps1, ps2, ps3 = st.columns([1, 1, 2])
+    with ps1:
+        page_mode = st.selectbox(
+            "Pages",
+            ["Single page", "All pages", "Page range"],
+            key="auction_page_mode_sel",
+            label_visibility="collapsed"
+        )
+    with ps2:
+        if page_mode == "Single page":
+            page_num = st.number_input("Page", min_value=1, value=1, step=1,
+                                        key="auction_page_num_inp", label_visibility="collapsed")
+            pages_to_scan = [int(page_num)]
+        elif page_mode == "All pages":
+            st.markdown("<div style='color:#64748b; font-size:0.75rem; padding-top:8px;'>All pages</div>",
+                        unsafe_allow_html=True)
+            pages_to_scan = None  # detect at scan time
+        else:
+            page_range = st.text_input("e.g. 1-5", value="1-3", label_visibility="collapsed",
+                                        key="auction_page_range")
+            try:
+                parts = page_range.split("-")
+                pages_to_scan = list(range(int(parts[0]), int(parts[1]) + 1))
+            except Exception:
+                pages_to_scan = [1]
+
+    with col_scan:
+        scan_clicked = st.button("🔍  Scan", use_container_width=True, type="primary",
+                                  disabled=not auction_url.strip())
+
+    if scan_clicked and auction_url.strip():
+        # Clear previous results
+        if st.session_state.auction_session_id:
+            try:
+                supabase.table("auction_items").delete().eq(
+                    "session_id", st.session_state.auction_session_id
+                ).execute()
+            except Exception:
+                pass
+
+        session_id = str(uuid.uuid4())
+        st.session_state.auction_session_id = session_id
+        st.session_state.auction_items      = []
+        st.session_state.auction_scanning   = True
+
+        with st.spinner("Scraping auction listings..."):
+            try:
+                from auction_scraper import scrape_and_store, get_page_count, get_page_url
+
+                if pages_to_scan is None:
+                    total = get_page_count(auction_url.strip())
+                    pages_to_scan = list(range(1, total + 1))
+
+                item_ids = scrape_and_store(auction_url.strip(), session_id, pages_to_scan)
+                st.session_state.auction_scanning = False
+
+                # Fetch stored items immediately so UI shows them
+                result = supabase.table("auction_items").select("*").eq(
+                    "session_id", session_id
+                ).order("scraped_at").execute()
+                st.session_state.auction_items = result.data or []
+                st.session_state.auction_enrich_ids = item_ids
+                st.session_state.auction_auto_enrich = True
+
+                st.rerun()
+
+            except Exception as e:
+                st.session_state.auction_scanning = False
+                st.error(f"Scan failed: {e}")
+
+    # ---- Results ----------------------------------------------------- #
+    if st.session_state.auction_items:
+        items = st.session_state.auction_items
+
+        # Refresh values from DB
+        if st.session_state.auction_session_id:
+            try:
+                result = supabase.table("auction_items").select("*").eq(
+                    "session_id", st.session_state.auction_session_id
+                ).order("scraped_at").execute()
+                items = result.data or []
+                st.session_state.auction_items = items
+            except Exception:
+                pass
+
+        total_items  = len(items)
+        valued_items = sum(1 for i in items if i.get("value_status") == "done")
+        favorited    = sum(1 for i in items if i.get("favorited"))
+
+        # Stats
+        as1, as2, as3, as4 = st.columns(4)
+        for col, val, label, color in [
+            (as1, str(total_items),   "Listings Found",  "#b45309"),
+            (as2, str(valued_items),  "Values Found",    "#0891b2"),
+            (as3, str(total_items - valued_items), "Pending",  "#94a3b8"),
+            (as4, str(favorited),     "Favorited",       "#dc2626"),
+        ]:
+            with col:
+                st.markdown(f"""
+                <div style='background:#ffffff; border:1px solid #e2e8f0; border-top:3px solid {color};
+                border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.75rem; box-shadow:0 1px 3px rgba(0,0,0,0.04);'>
+                    <div style='color:#0f172a; font-size:1.6rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{val}</div>
+                    <div style='color:#64748b; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>{label}</div>
+                </div>""", unsafe_allow_html=True)
+
+        # Auto-enrich: runs immediately after scraping or manually if needed
+        pending = [i for i in items if i.get("value_status") == "pending"]
+
+        if st.session_state.get("auction_auto_enrich") and pending:
+            st.session_state.auction_auto_enrich = False
+            ids = st.session_state.get("auction_enrich_ids", [i["id"] for i in pending])
+            total_e = len(ids)
+            prog_bar = st.progress(0, text=f"Researching {total_e} items across the web...")
+
+            def update_progress(done, total, title):
+                prog_bar.progress(done / total, text=f"Researching {done}/{total}: {title[:40]}...")
+
+            try:
+                from auction_scraper import enrich_values
+                enrich_values(ids, progress_callback=update_progress)
+                prog_bar.empty()
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as e:
+                prog_bar.empty()
+                st.error(f"Value lookup failed: {e}")
+
+        elif pending:
+            if st.button(f"🔄  Retry Value Lookup ({len(pending)} pending)", use_container_width=True, type="secondary"):
+                st.session_state.auction_auto_enrich = True
+                st.rerun()
+
+        st.divider()
+
+        # Filter row
+        f1, f2, f3 = st.columns([3, 1, 1])
+        with f1:
+            search_q = st.text_input("Search listings", placeholder="Filter by title...",
+                                      label_visibility="collapsed", key="auction_search")
+        with f2:
+            show_fav = st.checkbox("Favorites only", key="auction_fav_only")
+        with f3:
+            sort_by = st.selectbox("Sort", ["Default", "Price ↑", "Price ↓", "Value ↑"],
+                                    label_visibility="collapsed", key="auction_sort")
+
+        # Apply filters
+        filtered = items.copy()
+        if search_q:
+            filtered = [i for i in filtered if search_q.lower() in i.get("title","").lower()]
+        if show_fav:
+            filtered = [i for i in filtered if i.get("favorited")]
+        if sort_by == "Price ↑":
+            filtered.sort(key=lambda x: x.get("current_price", 0))
+        elif sort_by == "Price ↓":
+            filtered.sort(key=lambda x: x.get("current_price", 0), reverse=True)
+        elif sort_by == "Value ↑":
+            filtered.sort(key=lambda x: x.get("value_used_high", 0))
+
+        st.markdown(f"<p style='color:#94a3b8; font-size:0.75rem; margin-bottom:0.75rem;'>Showing {len(filtered)} of {total_items} listings</p>",
+                    unsafe_allow_html=True)
+
+        # Item cards
+        for item in filtered:
+            item_id      = item.get("id", "")
+            title        = item.get("title", "Unknown")
+            cur_price    = float(item.get("current_price", 0) or 0)
+            time_left    = item.get("time_left", "")
+            image_url    = item.get("image_url", "")
+            listing_url  = item.get("listing_url", "")
+            val_used_low = float(item.get("value_used_low", 0) or 0)
+            val_used_hi  = float(item.get("value_used_high", 0) or 0)
+            val_new_low  = float(item.get("value_new_low", 0) or 0)
+            val_new_hi   = float(item.get("value_new_high", 0) or 0)
+            val_status   = item.get("value_status", "pending")
+            favorited    = item.get("favorited", False)
+
+            # Value indicator
+            margin = (val_used_hi - cur_price) if val_used_hi > 0 else 0
+            if val_status == "done" and val_used_hi > 0:
+                if margin > 0:
+                    border_color = "#16a34a"  # green - good deal
+                    margin_label = f"↑ ${margin:.0f} potential margin"
+                    margin_color = "#16a34a"
+                else:
+                    border_color = "#dc2626"  # red - above market
+                    margin_label = f"↓ ${abs(margin):.0f} above market"
+                    margin_color = "#dc2626"
+            else:
+                border_color = "#e2e8f0"
+                margin_label = ""
+                margin_color = "#94a3b8"
+
+            fav_color = "#dc2626" if favorited else "#e2e8f0"
+
+            st.markdown(
+                f"<div style='background:#ffffff; border:1px solid {border_color}; "
+                f"border-radius:12px; padding:0.75rem; margin-bottom:0.5rem; "
+                f"box-shadow:0 1px 3px rgba(0,0,0,0.05);'>",
+                unsafe_allow_html=True
+            )
+
+            img_col, info_col, action_col = st.columns([1, 4, 1])
+
+            with img_col:
+                if image_url:
+                    st.markdown(
+                        f"<a href='{listing_url}' target='_blank'>"
+                        f"<img src='{image_url}' style='width:100%; border-radius:8px; "
+                        f"object-fit:cover; max-height:90px; cursor:pointer;' /></a>",
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown(
+                        "<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; "
+                        "height:80px; display:flex; align-items:center; justify-content:center; "
+                        "color:#94a3b8; font-size:1.2rem;'>🔨</div>",
+                        unsafe_allow_html=True
+                    )
+
+            with info_col:
+                ai_description = item.get("ai_description", "")
+                ai_confidence  = item.get("ai_confidence", "")
+                value_source   = item.get("value_source", "")
+                is_gemini      = value_source == "gemini_vision"
+
+                # Title + AI badge
+                ai_badge = ""
+                if is_gemini and val_status == "done":
+                    conf_color = {"high":"#16a34a","medium":"#d97706","low":"#dc2626"}.get(ai_confidence,"#64748b")
+                    ai_badge = f"<span style=\'background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; border-radius:4px; font-size:0.6rem; font-weight:600; padding:1px 6px; margin-left:6px;\'>🤖 AI Vision · {ai_confidence} confidence</span>"
+                elif is_gemini:
+                    ai_badge = "<span style=\'background:#eff6ff; color:#2563eb; border:1px solid #93c5fd; border-radius:4px; font-size:0.6rem; padding:1px 6px; margin-left:6px;\'>🤖 AI analyzing...</span>"
+
+                st.markdown(
+                    f"<div style=\'color:#0f172a; font-size:0.85rem; font-weight:600; "
+                    f"margin-bottom:4px; line-height:1.3;\'>{title[:120]}{ai_badge}</div>",
+                    unsafe_allow_html=True
+                )
+
+                # AI description (if available and different from title)
+                if ai_description and ai_description.lower()[:30] != title.lower()[:30]:
+                    st.markdown(
+                        f"<div style=\'color:#475569; font-size:0.76rem; margin-bottom:5px; "
+                        f"background:#f8fafc; border-left:3px solid #cbd5e1; padding:4px 8px; "
+                        f"border-radius:0 6px 6px 0;\'>📝 {ai_description}</div>",
+                        unsafe_allow_html=True
+                    )
+
+                # Price row
+                price_str = f"${cur_price:.2f}" if cur_price > 0 else "No bids"
+                time_str  = f" · ⏱ {time_left}" if time_left else ""
+
+                if val_status == "done" and val_used_hi > 0:
+                    val_str = f"Used: ${val_used_low:.0f}–${val_used_hi:.0f} &nbsp;·&nbsp; New: ${val_new_low:.0f}–${val_new_hi:.0f}"
+                    src_icon = "🤖" if is_gemini else "📦"
+                elif val_status == "pending":
+                    val_str = "⏳ Looking up value..."
+                    src_icon = ""
+                else:
+                    val_str = "Value unavailable"
+                    src_icon = ""
+
+                st.markdown(f"""
+                <div style='display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:3px;'>
+                    <span style='color:#0f172a; font-size:1rem; font-weight:700;'>{price_str}</span>
+                    <span style='color:#64748b; font-size:0.75rem;'>{time_str}</span>
+                    {f"<span style='color:{margin_color}; font-size:0.72rem; font-weight:600;'>{margin_label}</span>" if margin_label else ""}
+                </div>
+                <div style='color:#64748b; font-size:0.72rem;'>{src_icon} Est. value: {val_str}</div>
+                """, unsafe_allow_html=True)
+
+            with action_col:
+                # Favorite toggle
+                fav_label = "❤️" if favorited else "🤍"
+                if st.button(fav_label, key=f"fav_{item_id}", use_container_width=True):
+                    try:
+                        supabase.table("auction_items").update(
+                            {"favorited": not favorited}
+                        ).eq("id", item_id).execute()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed: {e}")
+
+                # View listing button
+                if listing_url:
+                    st.markdown(
+                        f"<a href='{listing_url}' target='_blank' style='display:block; "
+                        f"text-align:center; background:#eff6ff; border:1px solid #93c5fd; "
+                        f"border-radius:6px; padding:5px 8px; color:#1d4ed8; font-size:0.7rem; "
+                        f"font-weight:600; text-decoration:none; margin-top:4px;'>View ↗</a>",
+                        unsafe_allow_html=True
+                    )
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # Clear session
+        st.divider()
+        if st.button("🗑️  Clear Results", use_container_width=True, type="secondary"):
+            if st.session_state.auction_session_id:
+                try:
+                    supabase.table("auction_items").delete().eq(
+                        "session_id", st.session_state.auction_session_id
+                    ).execute()
+                except Exception:
+                    pass
+            st.session_state.auction_session_id = None
+            st.session_state.auction_items      = []
+            st.rerun()
+
+    elif not scan_clicked:
+        st.markdown("""
+        <div style='text-align:center; padding:3rem 0; color:#94a3b8;'>
+            <div style='font-size:3rem; margin-bottom:0.75rem;'>🔨</div>
+            <div style='color:#475569; font-size:1rem; font-weight:500; margin-bottom:0.4rem;'>No auction scanned yet</div>
+            <div style='font-size:0.82rem;'>
+                Paste an auction URL above and click Scan.<br>
+                Works with BidSpotter, Purple Wave, IronPlanet, GovPlanet, and more.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+st.markdown("</div>", unsafe_allow_html=True)
+with t2:
+    st.markdown("<div class='tab-camera'>", unsafe_allow_html=True)
+    if st.button("📸  Scan New Items", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "camera" else "secondary"):
+        st.session_state.active_tab = "camera"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t3:
+    st.markdown("<div class='tab-batch'>", unsafe_allow_html=True)
+    if st.button("📁  Batch Upload", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "batch" else "secondary"):
+        st.session_state.active_tab = "batch"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t4:
+    st.markdown("<div class='tab-research'>", unsafe_allow_html=True)
+    if st.button("🔍  Research", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "research" else "secondary"):
+        st.session_state.active_tab = "research"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t5:
+    st.markdown("<div class='tab-auction'>", unsafe_allow_html=True)
+    if st.button("🔨  Auction Scanner", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "auction" else "secondary"):
+        st.session_state.active_tab = "auction"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t6:
+    with st.popover("⬇️  Download Spreadsheet", use_container_width=True):
+        st.markdown("<div style='padding:4px 0;'>", unsafe_allow_html=True)
+        if not df_top.empty:
+            csv_df = df_top.copy()
+            if "created_at" in csv_df.columns:
+                csv_df["created_at"] = csv_df["created_at"].astype(str)
+            st.download_button(
+                label="📄  Raw Data Spreadsheet",
+                data=csv_df.to_csv(index=False).encode("utf-8"),
+                file_name="listerai_inventory.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+            st.download_button(
+                label="🛒  eBay Upload Sheet",
+                data=build_ebay_csv(df_top),
+                file_name=f"listerai_ebay_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        else:
+            st.markdown("<div style='color:#9ca3af; font-size:0.82rem;'>No items in batch yet.</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<div class='page-content'>", unsafe_allow_html=True)
 
 st.markdown("</div>", unsafe_allow_html=True)
