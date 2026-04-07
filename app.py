@@ -209,6 +209,7 @@ st.markdown("""
     .tab-batch     [data-testid="baseButton-primary"] { background: #0891b2 !important; }
     .tab-research  [data-testid="baseButton-primary"] { background: #7c3aed !important; }
     .tab-auction   [data-testid="baseButton-primary"] { background: #b45309 !important; }
+    .tab-settings  [data-testid="baseButton-primary"] { background: #475569 !important; }
 
     .field-label {
         color: #64748b;
@@ -580,7 +581,7 @@ box-shadow: 0 1px 4px rgba(0,0,0,0.06);'>
 
 # Color-coded nav toolbar — separated from page content
 st.markdown("<div style='background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:4px 8px;'>", unsafe_allow_html=True)
-t1, t2, t3, t4, t5, t6 = st.columns([2, 1.5, 1.5, 1.5, 1.5, 1.5])
+t1, t2, t3, t4, t5, t6, t7 = st.columns([2, 1.5, 1.5, 1.5, 1.5, 1, 1.5])
 with t1:
     st.markdown("<div class='tab-dashboard'>", unsafe_allow_html=True)
     if st.button("📊  Batch Dashboard", use_container_width=True,
@@ -616,6 +617,37 @@ with t5:
         st.session_state.active_tab = "auction"
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
+with t6:
+    st.markdown("<div class='tab-settings'>", unsafe_allow_html=True)
+    if st.button("⚙️  Settings", use_container_width=True,
+                 type="primary" if st.session_state.active_tab == "settings" else "secondary"):
+        st.session_state.active_tab = "settings"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+with t7:
+    with st.popover("⬇️ Spreadsheet", use_container_width=True):
+        if not df_top.empty:
+            csv_df = df_top.copy()
+            if "created_at" in csv_df.columns:
+                csv_df["created_at"] = csv_df["created_at"].astype(str)
+            st.download_button(
+                label="📄  Raw Data Spreadsheet",
+                data=csv_df.to_csv(index=False).encode("utf-8"),
+                file_name="listerai_inventory.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+            st.download_button(
+                label="🛒  eBay Upload Sheet",
+                data=build_ebay_csv(df_top),
+                file_name=f"listerai_ebay_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        else:
+            st.markdown("<div style='color:#9ca3af; font-size:0.82rem;'>No items yet.</div>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
 # ================================================================== #
 #  TAB: CAMERA SCAN
 # ================================================================== #
@@ -1781,5 +1813,112 @@ elif st.session_state.active_tab == "auction":
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div class='page-content'>", unsafe_allow_html=True)
+
+# ================================================================== #
+#  TAB: SETTINGS
+# ================================================================== #
+
+if st.session_state.active_tab == "settings":
+
+    st.markdown("""
+    <div style='margin-bottom:1rem;'>
+        <div style='color:#0f172a; font-size:1.1rem; font-weight:700; margin-bottom:2px;'>⚙️ Settings</div>
+        <div style='color:#64748b; font-size:0.8rem;'>Configure API keys and credentials. Changes are saved to Supabase and take effect immediately.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Load existing settings from Supabase
+    @st.cache_data(ttl=60)
+    def load_settings():
+        try:
+            r = supabase.table("app_settings").select("*").execute()
+            return {row["key"]: row["value"] for row in (r.data or [])}
+        except Exception:
+            return {}
+
+    def save_setting(key: str, value: str):
+        try:
+            supabase.table("app_settings").upsert({"key": key, "value": value}).execute()
+            st.cache_data.clear()
+            return True
+        except Exception as e:
+            st.error(f"Failed to save: {e}")
+            return False
+
+    settings = load_settings()
+
+    # ---- Gemini API -------------------------------------------- #
+    st.markdown("""
+    <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid #2563eb;
+    border-radius:10px; padding:1rem 1.25rem; margin-bottom:1rem;'>
+        <div style='color:#0f172a; font-size:0.9rem; font-weight:600; margin-bottom:4px;'>🤖 Google Gemini API</div>
+        <div style='color:#64748b; font-size:0.75rem;'>Used for AI scanning, image analysis, and auction value research.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    current_gemini = settings.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+    masked_gemini  = f"{current_gemini[:8]}...{current_gemini[-4:]}" if len(current_gemini) > 12 else ("Set" if current_gemini else "Not set")
+
+    st.markdown(f"<div class='field-label'>Current Key</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color:#475569; font-size:0.8rem; margin-bottom:8px; font-family:monospace;'>{masked_gemini}</div>", unsafe_allow_html=True)
+
+    g1, g2 = st.columns([4, 1])
+    with g1:
+        new_gemini = st.text_input("Gemini API Key", placeholder="AIza...", type="password",
+                                    label_visibility="collapsed", key="settings_gemini_key")
+    with g2:
+        if st.button("Save", key="save_gemini", use_container_width=True, type="primary"):
+            if new_gemini.strip():
+                if save_setting("GEMINI_API_KEY", new_gemini.strip()):
+                    st.success("✅ Gemini key saved")
+            else:
+                st.warning("Enter a key first")
+
+    st.markdown("<div style='color:#94a3b8; font-size:0.72rem; margin-bottom:1.5rem;'>Get your key at console.cloud.google.com → APIs & Services → Credentials</div>", unsafe_allow_html=True)
+
+    # ---- eBay API ---------------------------------------------- #
+    st.markdown("""
+    <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid #ea580c;
+    border-radius:10px; padding:1rem 1.25rem; margin-bottom:1rem;'>
+        <div style='color:#0f172a; font-size:0.9rem; font-weight:600; margin-bottom:4px;'>🏷️ eBay API Credentials</div>
+        <div style='color:#64748b; font-size:0.75rem;'>Used for direct listing submission. Find these at developer.ebay.com → Application Keys → Production.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    ebay_fields = [
+        ("EBAY_APP_ID",     "App ID (Client ID)",    "sebastia-Listinga-PRD-..."),
+        ("EBAY_DEV_ID",     "Dev ID",                "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"),
+        ("EBAY_CERT_ID",    "Cert ID (Client Secret)","PRD-xxxxxxxxxxxxxxxx-xxxx-xxxx-xxxx-xxxx"),
+        ("EBAY_USER_TOKEN", "User Token",             "v^1.1#i^1..."),
+    ]
+
+    for key, label, placeholder in ebay_fields:
+        current_val = settings.get(key, os.getenv(key, ""))
+        masked = f"{current_val[:6]}...{current_val[-4:]}" if len(current_val) > 10 else ("Set" if current_val else "Not set")
+        st.markdown(f"<div class='field-label'>{label} <span style='color:#94a3b8;'>({masked})</span></div>", unsafe_allow_html=True)
+        ef1, ef2 = st.columns([4, 1])
+        with ef1:
+            new_val = st.text_input(label, placeholder=placeholder, type="password",
+                                     label_visibility="collapsed", key=f"settings_{key}")
+        with ef2:
+            if st.button("Save", key=f"save_{key}", use_container_width=True, type="primary"):
+                if new_val.strip():
+                    if save_setting(key, new_val.strip()):
+                        st.success(f"✅ {label} saved")
+                else:
+                    st.warning("Enter a value first")
+
+    st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
+
+    # ---- Supabase info (read only) ----------------------------- #
+    st.markdown("""
+    <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1rem 1.25rem; margin-top:1rem;'>
+        <div style='color:#0f172a; font-size:0.9rem; font-weight:600; margin-bottom:8px;'>🗄️ Supabase</div>
+        <div style='color:#64748b; font-size:0.75rem; margin-bottom:4px;'>Project ID: fmrecxmhvodmkuimvjhi</div>
+        <div style='color:#64748b; font-size:0.75rem; margin-bottom:4px;'>URL: https://fmrecxmhvodmkuimvjhi.supabase.co</div>
+        <div style='color:#94a3b8; font-size:0.72rem;'>Supabase credentials are managed via Railway environment variables.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 st.markdown("</div>", unsafe_allow_html=True)
