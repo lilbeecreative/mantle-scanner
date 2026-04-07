@@ -843,55 +843,6 @@ if st.session_state.active_tab == "camera":
                     with col: st.image(pb, use_container_width=True)
             if remaining > 0:
                 st.markdown(f"<div style='color:#4a4a5a; font-size:0.72rem; margin-bottom:4px;'>Photo {photo_count+1} of up to 10</div>", unsafe_allow_html=True)
-                # Force rear camera via JS injection
-                st.markdown("""
-                <script>
-                (function() {
-                    function forceRearCamera() {
-                        var videos = document.querySelectorAll('video');
-                        videos.forEach(function(video) {
-                            if (video.srcObject) {
-                                var tracks = video.srcObject.getTracks();
-                                tracks.forEach(function(track) { track.stop(); });
-                            }
-                        });
-                        navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: { exact: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-                        }).then(function(stream) {
-                            var videos = document.querySelectorAll('video');
-                            videos.forEach(function(v) { v.srcObject = stream; });
-                        }).catch(function() {
-                            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-                            .then(function(stream) {
-                                var videos = document.querySelectorAll('video');
-                                videos.forEach(function(v) { v.srcObject = stream; });
-                            });
-                        });
-                    }
-                    setTimeout(forceRearCamera, 800);
-                })();
-                </script>
-                <style>
-                    [data-testid="stCameraInput"] { border-radius: 16px; overflow: hidden; }
-                    [data-testid="stCameraInput"] video {
-                        width: 100% !important;
-                        border-radius: 16px;
-                        max-height: 65vh;
-                        object-fit: cover;
-                    }
-                    [data-testid="stCameraInput"] button {
-                        background: #ea580c !important;
-                        color: white !important;
-                        border-radius: 50px !important;
-                        font-size: 1rem !important;
-                        font-weight: 700 !important;
-                        padding: 12px 40px !important;
-                        border: none !important;
-                        width: 100% !important;
-                        margin-top: 8px !important;
-                    }
-                </style>
-                """, unsafe_allow_html=True)
                 cam_img = st.camera_input("Take photo", label_visibility="collapsed", key=f"cam_{st.session_state.cam_group_id}_{photo_count}")
                 if cam_img:
                     st.session_state.cam_photos.append(cam_img.read()); st.rerun()
@@ -911,15 +862,38 @@ if st.session_state.active_tab == "camera":
             with da:
                 done_disabled = len(st.session_state.cam_photos) == 0
                 if st.button("✓  Done — Send to Scanner" if not done_disabled else "Take at least one photo", use_container_width=True, type="primary", disabled=done_disabled):
-                    with st.spinner("Uploading..."):
-                        group_id = st.session_state.cam_group_id; uploaded = 0
+                    with st.spinner(f"Uploading {len(st.session_state.cam_photos)} photos..."):
+                        group_id = st.session_state.cam_group_id
+                        uploaded = 0
+                        errors = []
                         for i, pb in enumerate(st.session_state.cam_photos):
-                            try: cam_upload(pb, group_id, i); uploaded += 1
-                            except Exception as e: st.error(f"Photo {i+1} failed: {e}")
-                        supabase.table("listing_groups").update({"condition":st.session_state.cam_condition,"quantity":st.session_state.cam_qty,"status":"pending"}).eq("id",group_id).execute()
-                        st.session_state.cam_items.append({"group_id":group_id,"condition":st.session_state.cam_condition,"qty":st.session_state.cam_qty,"status":"pending","photo_count":uploaded})
-                        st.session_state.cam_group_id = None; st.session_state.cam_photos = []; st.session_state.cam_qty = 1
-                        st.cache_data.clear(); st.rerun()
+                            try:
+                                cam_upload(pb, group_id, i)
+                                uploaded += 1
+                            except Exception as e:
+                                errors.append(f"Photo {i+1}: {e}")
+                        if errors:
+                            for err in errors:
+                                st.error(err)
+                        supabase.table("listing_groups").update({
+                            "condition": st.session_state.cam_condition,
+                            "quantity":  st.session_state.cam_qty,
+                            "status":    "pending"
+                        }).eq("id", group_id).execute()
+                        st.session_state.cam_items.append({
+                            "group_id":    group_id,
+                            "condition":   st.session_state.cam_condition,
+                            "qty":         st.session_state.cam_qty,
+                            "status":      "pending",
+                            "photo_count": uploaded
+                        })
+                        st.success(f"✅ {uploaded} photo(s) uploaded — item sent to scanner!")
+                        time.sleep(1.5)
+                        st.session_state.cam_group_id = None
+                        st.session_state.cam_photos   = []
+                        st.session_state.cam_qty      = 1
+                        st.cache_data.clear()
+                        st.rerun()
             with db:
                 if st.button("✗  Cancel Item", use_container_width=True, type="secondary"):
                     try: supabase.table("listing_groups").delete().eq("id",st.session_state.cam_group_id).execute()
