@@ -963,19 +963,19 @@ elif st.session_state.active_tab == "dashboard":
                 st.rerun()
         with eb3:
             submit_label = f"🏷️  Submit {sel_count} to eBay" if sel_count > 0 else "🏷️  Submit to eBay"
-            if st.button(submit_label, use_container_width=True, type="primary",
-                         key="ebay_submit_btn", disabled=sel_count == 0):
-                st.session_state.ebay_submitting = True
-                st.rerun()
+            submit_clicked = st.button(submit_label, use_container_width=True, type="primary",
+                         key="ebay_submit_btn", disabled=sel_count == 0)
 
-        if st.session_state.ebay_submitting and sel_count > 0:
+        if submit_clicked and sel_count > 0:
             selected_ids = [k for k, v in st.session_state.ebay_selected.items() if v]
             selected_df  = df[df["id"].astype(str).isin(selected_ids)]
+            st.info(f"Submitting {len(selected_df)} listings to eBay — do not close this page...")
             prog = st.progress(0, text=f"Submitting {len(selected_df)} listings to eBay...")
             results = []
             for i, (_, row) in enumerate(selected_df.iterrows()):
                 prog.progress((i+1)/len(selected_df), text=f"Submitting: {str(row.get('title',''))[:40]}...")
                 result = submit_to_ebay(row.to_dict())
+                st.write(f"Item {i+1}: {result}")  # debug — remove after testing
                 if result["success"]:
                     supabase.table("listings").update({
                         "ebay_item_id":      result["item_id"],
@@ -986,17 +986,14 @@ elif st.session_state.active_tab == "dashboard":
                 else:
                     results.append({"title": str(row.get("title",""))[:40], "error": result["error"], "success": False})
             prog.empty()
-            st.session_state.ebay_submitting = False
             st.session_state.ebay_selected = {}
             st.cache_data.clear()
             success_count = sum(1 for r in results if r["success"])
-            fail_count    = len(results) - success_count
             if success_count > 0:
-                st.success(f"✅ {success_count} listings submitted to eBay as scheduled drafts. They appear in Seller Hub under Scheduled Listings.")
+                st.success(f"✅ {success_count} listings submitted to eBay as scheduled drafts. Check Seller Hub under Scheduled Listings.")
             for r in results:
                 if not r["success"]:
                     st.error(f"❌ {r['title']}: {r['error']}")
-            st.rerun()
 
         st.divider()
         st.markdown("<div class='section-label'>Items</div>", unsafe_allow_html=True)
