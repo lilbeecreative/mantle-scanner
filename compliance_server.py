@@ -10,7 +10,7 @@ import uvicorn
 app = FastAPI()
 
 # Set this in Railway environment variables
-VERIFICATION_TOKEN = os.getenv("EBAY_VERIFICATION_TOKEN", "listerai-ebay-compliance-token-2024-secure")
+VERIFICATION_TOKEN = os.getenv("EBAY_VERIFICATION_TOKEN", "listeraiebaycompliancetoken2024secure1234")
 
 @app.get("/")
 def root():
