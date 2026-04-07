@@ -433,21 +433,29 @@ def submit_to_ebay(item: dict) -> dict:
             timeout=20
         )
         print(f"eBay response status: {resp.status_code}")
-        print(f"eBay response: {resp.text[:500]}")
+        print(f"eBay response: {resp.text[:2000]}")
 
         root = ET.fromstring(resp.text)
         ns   = {"e": "urn:ebay:apis:eBLBaseComponents"}
 
         ack = root.findtext("e:Ack", namespaces=ns) or ""
-        if ack in ("Success", "Warning"):
-            item_id = root.findtext("e:ItemID", namespaces=ns) or ""
+
+        # Always try to get ItemID first — present on success AND warning
+        item_id = root.findtext("e:ItemID", namespaces=ns) or ""
+
+        if item_id:
+            # Got an item ID — listing was created (warnings are non-fatal)
             return {"success": True, "item_id": item_id}
-        else:
+        elif ack == "Failure":
             errors = root.findall(".//e:Error", ns)
-            msgs   = [e.findtext("e:ShortMessage", namespaces=ns) or "" for e in errors]
-            long_msgs = [e.findtext("e:LongMessage", namespaces=ns) or "" for e in errors]
-            full_error = " | ".join(msgs) + " — " + " | ".join(long_msgs)
-            return {"success": False, "error": full_error or f"Ack={ack} — {resp.text[:300]}"}
+            fatal  = [e for e in errors if e.findtext("e:SeverityCode", namespaces=ns) == "Error"]
+            msgs      = [e.findtext("e:ShortMessage", namespaces=ns) or "" for e in fatal] or                         [e.findtext("e:ShortMessage", namespaces=ns) or "" for e in errors]
+            long_msgs = [e.findtext("e:LongMessage", namespaces=ns) or "" for e in fatal] or                         [e.findtext("e:LongMessage", namespaces=ns) or "" for e in errors]
+            full_error = " | ".join(filter(None, msgs))
+            full_long  = " | ".join(filter(None, long_msgs))
+            return {"success": False, "error": f"{full_error} — {full_long}" if full_long else full_error or resp.text[:300]}
+        else:
+            return {"success": False, "error": f"Ack={ack}, no ItemID returned. Response: {resp.text[:500]}"}
 
     except Exception as e:
         return {"success": False, "error": str(e)}
