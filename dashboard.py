@@ -118,15 +118,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Mobile viewport
-st.markdown("""
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<style>
-    /* Prevent horizontal scroll on mobile */
-    body { overflow-x: hidden !important; }
-    .main .block-container { overflow-x: hidden !important; }
-</style>
-""", unsafe_allow_html=True)
+
 
 st.markdown("""
 <style>
@@ -582,8 +574,14 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
         title          = str(row.get("title", ""))[:80]
         price          = f"{float(row.get('price', 0)):.2f}"
         quantity       = str(int(row.get("quantity", 1)))
-        condition      = str(row.get("condition", "used")).strip().lower()
-        ebay_condition = "1000" if condition == "new" else "3000"
+        condition      = str(row.get("condition", "used") or "used").strip().lower()
+        # eBay condition IDs: 1000=New, 2000=Refurbished, 3000=Used
+        if condition in ("new", "brand new"):
+            ebay_condition = "1000"
+        elif condition in ("refurbished", "seller refurbished", "manufacturer refurbished"):
+            ebay_condition = "2000"
+        else:
+            ebay_condition = "3000"
 
         # Fetch ALL photos for this listing group
         pic_urls = []
@@ -637,7 +635,7 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
 #  DATA FETCH
 # ------------------------------------------------------------------ #
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=60)
 def fetch_listings():
     result = (
         supabase.table("listings")
@@ -1207,6 +1205,14 @@ elif st.session_state.active_tab == "dashboard":
                     {sub_html}
                 </div>""", unsafe_allow_html=True)
 
+        # Clear batch button - prominent placement
+        cl1, cl2 = st.columns([3, 1])
+        with cl2:
+            if st.button("🗑️  Clear Batch", use_container_width=True, type="secondary",
+                         key="clear_batch_top"):
+                st.session_state.confirm_clear = True
+                st.rerun()
+
         st.divider()
 
         # eBay submit bar
@@ -1655,17 +1661,25 @@ elif st.session_state.active_tab == "auction":
         st.session_state.auction_auto_enrich = False
     if "auction_enrich_ids" not in st.session_state:
         st.session_state.auction_enrich_ids = []
+    if "auction_enrich_running" not in st.session_state:
+        st.session_state.auction_enrich_running = False
+    if "auction_enrich_stop" not in st.session_state:
+        st.session_state.auction_enrich_stop = False
 
     # ---- Load sessions from DB ----------------------------------- #
-    @st.cache_data(ttl=30)
+    @st.cache_data(ttl=60)
     def fetch_auction_sessions():
         try:
             r = supabase.table("auction_sessions").select("*").order("created_at", desc=True).execute()
-            return r.data or []
+            data = r.data or []
+            # Active sessions first, archived at bottom
+            active   = [s for s in data if s.get("status","active") != "archived"]
+            archived = [s for s in data if s.get("status","active") == "archived"]
+            return active + archived
         except Exception:
             return []
 
-    @st.cache_data(ttl=15)
+    @st.cache_data(ttl=60)
     def fetch_auction_items(session_id):
         try:
             r = supabase.table("auction_items").select("*").eq("session_id", session_id).order("scraped_at").execute()
@@ -1692,7 +1706,11 @@ elif st.session_state.active_tab == "auction":
         sess_col, new_col = st.columns([4, 1])
         with sess_col:
             session_labels = {
-                s["session_id"]: f"{s.get('label','Scan')}  ·  {s.get('item_count',0)} items  ·  {s['created_at'][:10]}"
+                s["session_id"]: (
+                    f"📦 [Archived] {s.get('label','Scan')}  ·  {s.get('item_count',0)} items  ·  {s['created_at'][:10]}"
+                    if s.get("status") == "archived"
+                    else f"{s.get('label','Scan')}  ·  {s.get('item_count',0)} items  ·  {s['created_at'][:10]}"
+                )
                 for s in sessions
             }
             selected_label = st.selectbox(
@@ -1789,20 +1807,31 @@ elif st.session_state.active_tab == "auction":
         # Auto-enrich if just scanned
         if st.session_state.get("auction_auto_enrich") and items:
             st.session_state.auction_auto_enrich = False
+            st.session_state.auction_enrich_stop = False
             ids = st.session_state.get("auction_enrich_ids", [i["id"] for i in items if i.get("value_status") == "pending"])
             total_e = len(ids)
             if total_e > 0:
                 import threading
-                st.info(f"🔍 Researching {total_e} items in the background — refresh the page in a few minutes to see values populate.", icon="⏳")
+                st.session_state.auction_enrich_running = True
+                st.info(f"🔍 Researching {total_e} items in the background. Use Stop button to pause.", icon="⏳")
 
-                def run_enrich(item_ids):
+                def run_enrich(item_ids, stop_flag):
                     try:
                         from auction_scraper import enrich_values
-                        enrich_values(item_ids)
+                        for i, item_id in enumerate(item_ids):
+                            if stop_flag["stop"]:
+                                print("Enrichment stopped by user")
+                                break
+                            from auction_scraper import enrich_values as ev
+                            ev([item_id])
                     except Exception as e:
                         print(f"Enrich error: {e}")
+                    finally:
+                        stop_flag["running"] = False
 
-                t = threading.Thread(target=run_enrich, args=(ids,), daemon=True)
+                stop_flag = {"stop": False, "running": True}
+                st.session_state._enrich_stop_flag = stop_flag
+                t = threading.Thread(target=run_enrich, args=(ids, stop_flag), daemon=True)
                 t.start()
 
         # Session action bar
@@ -1825,38 +1854,62 @@ elif st.session_state.active_tab == "auction":
         """, unsafe_allow_html=True)
 
         # Action buttons
-        ac1, ac2, ac3 = st.columns([2, 2, 1])
+        pending = [i for i in items if i.get("value_status") == "pending"]
+        is_running = getattr(st.session_state, "_enrich_stop_flag", {}).get("running", False)
+
+        ac1, ac2, ac3, ac4 = st.columns([2, 1.5, 1.5, 1])
         with ac1:
             if st.button("🔄  Refresh Scan", use_container_width=True, type="primary", key="auction_refresh"):
-                with st.spinner("Re-scraping and updating values..."):
+                with st.spinner("Re-scraping..."):
                     try:
-                        from auction_scraper import scrape_and_store, get_page_count, enrich_values
-                        # Delete old items for this session
+                        from auction_scraper import scrape_and_store
                         supabase.table("auction_items").delete().eq("session_id", session_id).execute()
-                        # Re-scrape
                         new_ids = scrape_and_store(source_url, session_id, [1])
-                        # Update session
                         supabase.table("auction_sessions").update({
-                            "item_count":     len(new_ids),
+                            "item_count": len(new_ids),
                             "last_refreshed": datetime.now().isoformat(),
                         }).eq("session_id", session_id).execute()
-                        # Re-enrich
                         st.session_state.auction_auto_enrich = True
                         st.session_state.auction_enrich_ids  = new_ids
                         st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
                         st.error(f"Refresh failed: {e}")
+
         with ac2:
-            pending = [i for i in items if i.get("value_status") == "pending"]
-            if pending:
-                if st.button(f"🔄  Retry Values ({len(pending)} pending)", use_container_width=True,
-                              type="secondary", key="auction_retry_values"):
+            if is_running:
+                # Running — show Stop button
+                if st.button("⏹  Stop Research", use_container_width=True, type="secondary", key="auction_stop"):
+                    flag = getattr(st.session_state, "_enrich_stop_flag", {})
+                    flag["stop"] = True
+                    st.session_state.auction_enrich_running = False
+                    st.info("Research stopped. Use Resume to continue.")
+                    st.rerun()
+            elif pending:
+                # Stopped/paused — show Resume button
+                if st.button(f"▶  Resume ({len(pending)})", use_container_width=True,
+                              type="secondary", key="auction_resume"):
                     st.session_state.auction_auto_enrich = True
                     st.session_state.auction_enrich_ids  = [i["id"] for i in pending]
                     st.rerun()
+
         with ac3:
-            if st.button("🗑️  Delete", use_container_width=True, type="secondary", key="auction_delete"):
+            # Archive session (keeps data, just marks archived)
+            if st.button("📦  Archive", use_container_width=True, type="secondary", key="auction_archive"):
+                try:
+                    supabase.table("auction_sessions").update(
+                        {"status": "archived"}
+                    ).eq("session_id", session_id).execute()
+                    st.session_state.auction_active_session = None
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Archive failed: {e}")
+
+        with ac4:
+            # Permanent delete
+            if st.button("🗑️", use_container_width=True, type="secondary", key="auction_delete",
+                         help="Permanently delete this scan"):
                 try:
                     supabase.table("auction_items").delete().eq("session_id", session_id).execute()
                     supabase.table("auction_sessions").delete().eq("session_id", session_id).execute()
@@ -2019,7 +2072,6 @@ elif st.session_state.active_tab == "auction":
                     if st.button(fav_label, key=f"fav_{item_id}", use_container_width=True):
                         try:
                             supabase.table("auction_items").update({"favorited": not favorited}).eq("id", item_id).execute()
-                            st.cache_data.clear()
                             st.rerun()
                         except Exception as e:
                             st.error(f"Failed: {e}")
