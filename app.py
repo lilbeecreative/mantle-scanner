@@ -265,9 +265,13 @@ def get_supabase() -> Client:
     return create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
 supabase       = get_supabase()
-SUPABASE_URL   = os.getenv("SUPABASE_URL")
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-NOTIFY_EMAIL   = "sebastian@lilbeecreative.com"
+SUPABASE_URL    = os.getenv("SUPABASE_URL")
+RESEND_API_KEY  = os.getenv("RESEND_API_KEY", "")
+NOTIFY_EMAIL    = "sebastian@lilbeecreative.com"
+EBAY_APP_ID_ENV = os.getenv("EBAY_APP_ID", "sebastia-Listinga-PRD-364adf036-d86654ba")
+EBAY_DEV_ID     = os.getenv("EBAY_DEV_ID", "533fb968-6cd9-41d3-96ea-bf0c554e5541")
+EBAY_CERT_ID    = os.getenv("EBAY_CERT_ID", "PRD-64adf036ff09-9009-4cd3-a744-0cd4")
+EBAY_USER_TOKEN = os.getenv("EBAY_USER_TOKEN", "")
 
 ARCHIVE_FILE    = "mantle_archive.csv"
 ARCHIVE_HEADERS = [
@@ -281,6 +285,10 @@ if "active_tab" not in st.session_state:
     st.session_state.active_tab = "dashboard"
 if "confirm_clear" not in st.session_state:
     st.session_state.confirm_clear = False
+if "ebay_selected" not in st.session_state:
+    st.session_state.ebay_selected = {}
+if "ebay_submitting" not in st.session_state:
+    st.session_state.ebay_submitting = False
 
 # ------------------------------------------------------------------ #
 #  HELPERS
@@ -321,6 +329,123 @@ def photo_url(photo_id: str) -> str:
     if not photo_id or str(photo_id) in ("0", "", "nan"):
         return ""
     return f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
+
+# ------------------------------------------------------------------ #
+#  eBay TRADING API — SUBMIT LISTING AS DRAFT (SCHEDULED)
+# ------------------------------------------------------------------ #
+
+EBAY_DESCRIPTION_TEMPLATE = """Shipped primarily with UPS and sometimes USPS. If you have special packing or shipping needs, please send a message.
+
+This item is sold in "as-is" condition. The seller assumes no liability for the use, operation, or installation of this product. Due to the technical nature of this equipment, the buyer is responsible for having the item professionally inspected and installed by a certified technician prior to use."""
+
+def submit_to_ebay(item: dict) -> dict:
+    """
+    Submit a listing to eBay as a scheduled draft (29 days out).
+    Returns: {"success": True, "item_id": "..."} or {"success": False, "error": "..."}
+    """
+    import xml.etree.ElementTree as ET
+    from datetime import timezone, timedelta
+
+    if not EBAY_USER_TOKEN:
+        return {"success": False, "error": "EBAY_USER_TOKEN not configured in Railway Variables"}
+
+    # Build photo URL
+    photo_id   = item.get("photo_id", "")
+    photo_url  = f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}" if photo_id else ""
+
+    # Condition ID
+    condition  = item.get("condition", "used").lower()
+    cond_id    = "1000" if condition == "new" else "3000"
+
+    # Category
+    cat_id     = str(item.get("ebay_category_id", "")).strip().replace(".0","") or "99"
+
+    # Price
+    price      = float(item.get("price", 0) or 0)
+    if price <= 0:
+        return {"success": False, "error": "Price must be greater than 0"}
+
+    # Title — eBay max 80 chars
+    title      = str(item.get("title", "")).strip()[:80]
+    if not title:
+        return {"success": False, "error": "Title is empty"}
+
+    # Quantity
+    quantity   = int(item.get("quantity", 1) or 1)
+
+    # Schedule 29 days from now (appears as draft in Seller Hub)
+    schedule_time = (datetime.now(timezone.utc) + timedelta(days=29)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    # Full description
+    item_desc  = item.get("description", "") or ""
+    full_desc  = (f"{item_desc}\n\n{EBAY_DESCRIPTION_TEMPLATE}".strip()
+                   if item_desc else EBAY_DESCRIPTION_TEMPLATE)
+
+    xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
+<AddItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>{EBAY_USER_TOKEN}</eBayAuthToken>
+  </RequesterCredentials>
+  <Item>
+    <Title>{title}</Title>
+    <Description><![CDATA[{full_desc}]]></Description>
+    <PrimaryCategory>
+      <CategoryID>{cat_id}</CategoryID>
+    </PrimaryCategory>
+    <StartPrice>{price:.2f}</StartPrice>
+    <ConditionID>{cond_id}</ConditionID>
+    <Country>US</Country>
+    <Currency>USD</Currency>
+    <DispatchTimeMax>3</DispatchTimeMax>
+    <ListingDuration>GTC</ListingDuration>
+    <ListingType>FixedPriceItem</ListingType>
+    <Location>Loveland, CO</Location>
+    <PostalCode>80537</PostalCode>
+    <Quantity>{quantity}</Quantity>
+    <BestOfferDetails>
+      <BestOfferEnabled>true</BestOfferEnabled>
+    </BestOfferDetails>
+    <ReturnPolicy>
+      <ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption>
+    </ReturnPolicy>
+    {f"<PictureDetails><PictureURL>{photo_url}</PictureURL></PictureDetails>" if photo_url else ""}
+    <ScheduleTime>{schedule_time}</ScheduleTime>
+    <SKU></SKU>
+  </Item>
+</AddItemRequest>"""
+
+    headers = {
+        "X-EBAY-API-COMPATIBILITY-LEVEL": "967",
+        "X-EBAY-API-DEV-NAME":   EBAY_DEV_ID,
+        "X-EBAY-API-APP-NAME":   EBAY_APP_ID_ENV,
+        "X-EBAY-API-CERT-NAME":  EBAY_CERT_ID,
+        "X-EBAY-API-CALL-NAME":  "AddItem",
+        "X-EBAY-API-SITEID":     "0",
+        "Content-Type":          "text/xml",
+    }
+
+    try:
+        import requests as req
+        resp = req.post(
+            "https://api.ebay.com/ws/api.dll",
+            data=xml_body.encode("utf-8"),
+            headers=headers,
+            timeout=20
+        )
+        root = ET.fromstring(resp.text)
+        ns   = {"e": "urn:ebay:apis:eBLBaseComponents"}
+
+        ack = root.findtext("e:Ack", namespaces=ns) or ""
+        if ack in ("Success", "Warning"):
+            item_id = root.findtext("e:ItemID", namespaces=ns) or ""
+            return {"success": True, "item_id": item_id}
+        else:
+            errors = root.findall(".//e:Error", ns)
+            msgs   = [e.findtext("e:ShortMessage", namespaces=ns) or "" for e in errors]
+            return {"success": False, "error": " | ".join(msgs) or "Unknown eBay error"}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 def update_field(item_id: str, field: str, value):
     try:
@@ -794,25 +919,78 @@ elif st.session_state.active_tab == "dashboard":
                 </div>""", unsafe_allow_html=True)
 
         st.divider()
+
+        # eBay submit bar
+        sel_count = sum(1 for v in st.session_state.ebay_selected.values() if v)
+        eb1, eb2, eb3 = st.columns([2, 2, 2])
+        with eb1:
+            if st.button("☑  Select All", use_container_width=True, type="secondary", key="ebay_sel_all"):
+                for _, row in df.iterrows():
+                    st.session_state.ebay_selected[str(row["id"])] = True
+                st.rerun()
+        with eb2:
+            if st.button("☐  Deselect All", use_container_width=True, type="secondary", key="ebay_desel_all"):
+                st.session_state.ebay_selected = {}
+                st.rerun()
+        with eb3:
+            submit_label = f"🏷️  Submit {sel_count} to eBay" if sel_count > 0 else "🏷️  Submit to eBay"
+            if st.button(submit_label, use_container_width=True, type="primary",
+                         key="ebay_submit_btn", disabled=sel_count == 0):
+                st.session_state.ebay_submitting = True
+                st.rerun()
+
+        if st.session_state.ebay_submitting and sel_count > 0:
+            selected_ids = [k for k, v in st.session_state.ebay_selected.items() if v]
+            selected_df  = df[df["id"].astype(str).isin(selected_ids)]
+            prog = st.progress(0, text=f"Submitting {len(selected_df)} listings to eBay...")
+            results = []
+            for i, (_, row) in enumerate(selected_df.iterrows()):
+                prog.progress((i+1)/len(selected_df), text=f"Submitting: {str(row.get('title',''))[:40]}...")
+                result = submit_to_ebay(row.to_dict())
+                if result["success"]:
+                    supabase.table("listings").update({
+                        "ebay_item_id":      result["item_id"],
+                        "ebay_status":       "draft",
+                        "ebay_submitted_at": datetime.now().isoformat(),
+                    }).eq("id", str(row["id"])).execute()
+                    results.append({"title": str(row.get("title",""))[:40], "item_id": result["item_id"], "success": True})
+                else:
+                    results.append({"title": str(row.get("title",""))[:40], "error": result["error"], "success": False})
+            prog.empty()
+            st.session_state.ebay_submitting = False
+            st.session_state.ebay_selected = {}
+            st.cache_data.clear()
+            success_count = sum(1 for r in results if r["success"])
+            fail_count    = len(results) - success_count
+            if success_count > 0:
+                st.success(f"✅ {success_count} listings submitted to eBay as scheduled drafts. They appear in Seller Hub under Scheduled Listings.")
+            for r in results:
+                if not r["success"]:
+                    st.error(f"❌ {r['title']}: {r['error']}")
+            st.rerun()
+
+        st.divider()
         st.markdown("<div class='section-label'>Items</div>", unsafe_allow_html=True)
 
         if "quantities" not in st.session_state:
             st.session_state.quantities = {}
 
         for _, item in df.iterrows():
-            item_id    = str(item.get("id", ""))
-            pid        = str(item.get("photo_id", ""))
-            title      = str(item.get("title", "Unknown"))
-            price      = float(item.get("price", 0.0))
-            price_note = str(item.get("price_note", "")).strip().lower()
-            condition  = str(item.get("condition", "used")).strip().lower()
-            category   = str(item.get("ebay_category", ""))
-            cat_id     = str(item.get("ebay_category_id", "")).strip().replace(".0", "")
-            weight_oz  = float(item.get("weight_oz", 0.0) or 0.0)
-            price_used = float(item.get("price_used", 0.0) or 0.0)
-            price_new  = float(item.get("price_new",  0.0) or 0.0)
-            url        = photo_url(pid)
-            has_dual   = price_used > 0 or price_new > 0
+            item_id      = str(item.get("id", ""))
+            pid          = str(item.get("photo_id", ""))
+            title        = str(item.get("title", "Unknown"))
+            price        = float(item.get("price", 0.0))
+            price_note   = str(item.get("price_note", "")).strip().lower()
+            condition    = str(item.get("condition", "used")).strip().lower()
+            category     = str(item.get("ebay_category", ""))
+            cat_id       = str(item.get("ebay_category_id", "")).strip().replace(".0", "")
+            weight_oz    = float(item.get("weight_oz", 0.0) or 0.0)
+            price_used   = float(item.get("price_used", 0.0) or 0.0)
+            price_new    = float(item.get("price_new",  0.0) or 0.0)
+            url          = photo_url(pid)
+            has_dual     = price_used > 0 or price_new > 0
+            ebay_item_id = str(item.get("ebay_item_id","") or "")
+            ebay_status  = str(item.get("ebay_status","") or "")
 
             if item_id and item_id not in st.session_state.quantities:
                 st.session_state.quantities[item_id] = int(item.get("quantity", 0))
@@ -820,13 +998,25 @@ elif st.session_state.active_tab == "dashboard":
             current_qty = st.session_state.quantities.get(item_id, 0)
             flag_color  = "#f59e0b22" if price_note in ("new", "used") else "#1e1e28"
 
+            is_selected = st.session_state.ebay_selected.get(item_id, False)
+            card_border = "#2563eb" if is_selected else flag_color
+            ebay_badge = ""
+            if ebay_status == "draft" and ebay_item_id:
+                ebay_badge = f"<a href='https://www.ebay.com/itm/{ebay_item_id}' target='_blank' style='background:#eff6ff; color:#2563eb; border:1px solid #93c5fd; border-radius:4px; font-size:0.6rem; font-weight:600; padding:2px 7px; text-decoration:none; margin-left:6px;'>🏷️ eBay Draft #{ebay_item_id}</a>"
+
             st.markdown(
-                f"<div style='background:#ffffff; border:1px solid {flag_color}; "
+                f"<div style='background:#ffffff; border:1.5px solid {card_border}; "
                 f"border-radius:12px; padding:0.75rem; margin-bottom:0.5rem;'>",
                 unsafe_allow_html=True
             )
 
-            img_col, fields_col = st.columns([1, 4])
+            chk_col, img_col, fields_col = st.columns([0.3, 1, 4])
+            with chk_col:
+                checked = st.checkbox("", value=is_selected, key=f"chk_{item_id}",
+                                       label_visibility="collapsed")
+                if checked != is_selected:
+                    st.session_state.ebay_selected[item_id] = checked
+                    st.rerun()
 
             with img_col:
                 if url:
@@ -1154,423 +1344,378 @@ elif st.session_state.active_tab == "research":
 
 elif st.session_state.active_tab == "auction":
 
-    import threading
     import sys
     sys.path.insert(0, os.path.dirname(__file__) or ".")
 
-    # State
-    for k, v in [
-        ("auction_session_id", None),
-        ("auction_url", ""),
-        ("auction_items", []),
-        ("auction_scanning", False),
-        ("auction_enriching", False),
-        ("auction_page_mode", "single"),
-        ("auction_page_num", 1),
-        ("auction_auto_enrich", False),
-        ("auction_enrich_ids", []),
-    ]:
-        if k not in st.session_state:
-            st.session_state[k] = v
+    # ---- State --------------------------------------------------- #
+    if "auction_active_session" not in st.session_state:
+        st.session_state.auction_active_session = None
+    if "auction_auto_enrich" not in st.session_state:
+        st.session_state.auction_auto_enrich = False
+    if "auction_enrich_ids" not in st.session_state:
+        st.session_state.auction_enrich_ids = []
 
-    # ---- Header ----------------------------------------------------- #
+    # ---- Load sessions from DB ----------------------------------- #
+    @st.cache_data(ttl=30)
+    def fetch_auction_sessions():
+        try:
+            r = supabase.table("auction_sessions").select("*").order("created_at", desc=True).execute()
+            return r.data or []
+        except Exception:
+            return []
+
+    @st.cache_data(ttl=15)
+    def fetch_auction_items(session_id):
+        try:
+            r = supabase.table("auction_items").select("*").eq("session_id", session_id).order("scraped_at").execute()
+            return r.data or []
+        except Exception:
+            return []
+
+    sessions = fetch_auction_sessions()
+
+    # Auto-load most recent session on first visit
+    if st.session_state.auction_active_session is None and sessions:
+        st.session_state.auction_active_session = sessions[0]["session_id"]
+
+    # ---- Header -------------------------------------------------- #
     st.markdown("""
-    <div style='margin-bottom:1rem;'>
+    <div style='margin-bottom:0.75rem;'>
         <div style='color:#0f172a; font-size:1.1rem; font-weight:700; margin-bottom:2px;'>🔨 Auction Scanner</div>
-        <div style='color:#64748b; font-size:0.8rem;'>
-            Paste any auction URL — the scanner will pull all listings,
-            then look up eBay market values automatically.
-        </div>
+        <div style='color:#64748b; font-size:0.8rem;'>Paste any auction URL — scrapes listings and looks up market values automatically. Scans are saved and can be revisited anytime.</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # ---- URL Input -------------------------------------------------- #
-    col_url, col_scan = st.columns([4, 1])
-    with col_url:
-        auction_url = st.text_input(
-            "Auction URL",
-            value=st.session_state.auction_url,
-            placeholder="https://www.bidspotter.com/auctions/...",
-            label_visibility="collapsed",
-            key="auction_url_input"
-        )
-        st.session_state.auction_url = auction_url
-
-    # Page settings
-    ps1, ps2, ps3 = st.columns([1, 1, 2])
-    with ps1:
-        page_mode = st.selectbox(
-            "Pages",
-            ["Single page", "All pages", "Page range"],
-            key="auction_page_mode_sel",
-            label_visibility="collapsed"
-        )
-    with ps2:
-        if page_mode == "Single page":
-            page_num = st.number_input("Page", min_value=1, value=1, step=1,
-                                        key="auction_page_num_inp", label_visibility="collapsed")
-            pages_to_scan = [int(page_num)]
-        elif page_mode == "All pages":
-            st.markdown("<div style='color:#64748b; font-size:0.75rem; padding-top:8px;'>All pages</div>",
-                        unsafe_allow_html=True)
-            pages_to_scan = None  # detect at scan time
-        else:
-            page_range = st.text_input("e.g. 1-5", value="1-3", label_visibility="collapsed",
-                                        key="auction_page_range")
-            try:
-                parts = page_range.split("-")
-                pages_to_scan = list(range(int(parts[0]), int(parts[1]) + 1))
-            except Exception:
-                pages_to_scan = [1]
-
-    with col_scan:
-        scan_clicked = st.button("🔍  Scan", use_container_width=True, type="primary",
-                                  disabled=not auction_url.strip())
-
-    if scan_clicked and auction_url.strip():
-        # Clear previous results
-        if st.session_state.auction_session_id:
-            try:
-                supabase.table("auction_items").delete().eq(
-                    "session_id", st.session_state.auction_session_id
-                ).execute()
-            except Exception:
-                pass
-
-        session_id = str(uuid.uuid4())
-        st.session_state.auction_session_id = session_id
-        st.session_state.auction_items      = []
-        st.session_state.auction_scanning   = True
-
-        with st.spinner("Scraping auction listings..."):
-            try:
-                from auction_scraper import scrape_and_store, get_page_count, get_page_url
-
-                if pages_to_scan is None:
-                    total = get_page_count(auction_url.strip())
-                    pages_to_scan = list(range(1, total + 1))
-
-                item_ids = scrape_and_store(auction_url.strip(), session_id, pages_to_scan)
-                st.session_state.auction_scanning = False
-
-                # Fetch stored items immediately so UI shows them
-                result = supabase.table("auction_items").select("*").eq(
-                    "session_id", session_id
-                ).order("scraped_at").execute()
-                st.session_state.auction_items = result.data or []
-                st.session_state.auction_enrich_ids = item_ids
-                st.session_state.auction_auto_enrich = True
-
-                st.rerun()
-
-            except Exception as e:
-                st.session_state.auction_scanning = False
-                st.error(f"Scan failed: {e}")
-
-    # ---- Results ----------------------------------------------------- #
-    if st.session_state.auction_items:
-        items = st.session_state.auction_items
-
-        # Refresh values from DB
-        if st.session_state.auction_session_id:
-            try:
-                result = supabase.table("auction_items").select("*").eq(
-                    "session_id", st.session_state.auction_session_id
-                ).order("scraped_at").execute()
-                items = result.data or []
-                st.session_state.auction_items = items
-            except Exception:
-                pass
-
-        total_items  = len(items)
-        valued_items = sum(1 for i in items if i.get("value_status") == "done")
-        favorited    = sum(1 for i in items if i.get("favorited"))
-
-        # Stats
-        as1, as2, as3, as4 = st.columns(4)
-        for col, val, label, color in [
-            (as1, str(total_items),   "Listings Found",  "#b45309"),
-            (as2, str(valued_items),  "Values Found",    "#0891b2"),
-            (as3, str(total_items - valued_items), "Pending",  "#94a3b8"),
-            (as4, str(favorited),     "Favorited",       "#dc2626"),
-        ]:
-            with col:
-                st.markdown(f"""
-                <div style='background:#ffffff; border:1px solid #e2e8f0; border-top:3px solid {color};
-                border-radius:10px; padding:0.75rem 1rem; margin-bottom:0.75rem; box-shadow:0 1px 3px rgba(0,0,0,0.04);'>
-                    <div style='color:#0f172a; font-size:1.6rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{val}</div>
-                    <div style='color:#64748b; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>{label}</div>
-                </div>""", unsafe_allow_html=True)
-
-        # Auto-enrich: runs immediately after scraping or manually if needed
-        pending = [i for i in items if i.get("value_status") == "pending"]
-
-        if st.session_state.get("auction_auto_enrich") and pending:
-            st.session_state.auction_auto_enrich = False
-            ids = st.session_state.get("auction_enrich_ids", [i["id"] for i in pending])
-            total_e = len(ids)
-            prog_bar = st.progress(0, text=f"Researching {total_e} items across the web...")
-
-            def update_progress(done, total, title):
-                prog_bar.progress(done / total, text=f"Researching {done}/{total}: {title[:40]}...")
-
-            try:
-                from auction_scraper import enrich_values
-                enrich_values(ids, progress_callback=update_progress)
-                prog_bar.empty()
+    # ---- Saved sessions list + new scan controls ---------------- #
+    if sessions:
+        sess_col, new_col = st.columns([4, 1])
+        with sess_col:
+            session_labels = {
+                s["session_id"]: f"{s.get('label','Scan')}  ·  {s.get('item_count',0)} items  ·  {s['created_at'][:10]}"
+                for s in sessions
+            }
+            selected_label = st.selectbox(
+                "Saved scans",
+                options=list(session_labels.keys()),
+                format_func=lambda x: session_labels[x],
+                index=0 if st.session_state.auction_active_session not in session_labels
+                      else list(session_labels.keys()).index(st.session_state.auction_active_session),
+                label_visibility="collapsed",
+                key="auction_session_selector"
+            )
+            if selected_label != st.session_state.auction_active_session:
+                st.session_state.auction_active_session = selected_label
                 st.cache_data.clear()
                 st.rerun()
-            except Exception as e:
-                prog_bar.empty()
-                st.error(f"Value lookup failed: {e}")
-
-        elif pending:
-            if st.button(f"🔄  Retry Value Lookup ({len(pending)} pending)", use_container_width=True, type="secondary"):
-                st.session_state.auction_auto_enrich = True
+        with new_col:
+            if st.button("＋ New Scan", use_container_width=True, type="secondary"):
+                st.session_state.auction_active_session = None
+                st.session_state.auction_auto_enrich = False
                 st.rerun()
 
-        st.divider()
-
-        # Filter row
-        f1, f2, f3 = st.columns([3, 1, 1])
-        with f1:
-            search_q = st.text_input("Search listings", placeholder="Filter by title...",
-                                      label_visibility="collapsed", key="auction_search")
-        with f2:
-            show_fav = st.checkbox("Favorites only", key="auction_fav_only")
-        with f3:
-            sort_by = st.selectbox("Sort", ["Default", "Price ↑", "Price ↓", "Value ↑"],
-                                    label_visibility="collapsed", key="auction_sort")
-
-        # Apply filters
-        filtered = items.copy()
-        if search_q:
-            filtered = [i for i in filtered if search_q.lower() in i.get("title","").lower()]
-        if show_fav:
-            filtered = [i for i in filtered if i.get("favorited")]
-        if sort_by == "Price ↑":
-            filtered.sort(key=lambda x: x.get("current_price", 0))
-        elif sort_by == "Price ↓":
-            filtered.sort(key=lambda x: x.get("current_price", 0), reverse=True)
-        elif sort_by == "Value ↑":
-            filtered.sort(key=lambda x: x.get("value_used_high", 0))
-
-        st.markdown(f"<p style='color:#94a3b8; font-size:0.75rem; margin-bottom:0.75rem;'>Showing {len(filtered)} of {total_items} listings</p>",
-                    unsafe_allow_html=True)
-
-        # Item cards
-        for item in filtered:
-            item_id      = item.get("id", "")
-            title        = item.get("title", "Unknown")
-            cur_price    = float(item.get("current_price", 0) or 0)
-            time_left    = item.get("time_left", "")
-            image_url    = item.get("image_url", "")
-            listing_url  = item.get("listing_url", "")
-            val_used_low = float(item.get("value_used_low", 0) or 0)
-            val_used_hi  = float(item.get("value_used_high", 0) or 0)
-            val_new_low  = float(item.get("value_new_low", 0) or 0)
-            val_new_hi   = float(item.get("value_new_high", 0) or 0)
-            val_status   = item.get("value_status", "pending")
-            favorited    = item.get("favorited", False)
-
-            # Value indicator
-            margin = (val_used_hi - cur_price) if val_used_hi > 0 else 0
-            if val_status == "done" and val_used_hi > 0:
-                if margin > 0:
-                    border_color = "#16a34a"  # green - good deal
-                    margin_label = f"↑ ${margin:.0f} potential margin"
-                    margin_color = "#16a34a"
-                else:
-                    border_color = "#dc2626"  # red - above market
-                    margin_label = f"↓ ${abs(margin):.0f} above market"
-                    margin_color = "#dc2626"
+    # ---- New scan form ------------------------------------------- #
+    if st.session_state.auction_active_session is None:
+        st.markdown("<div style='height:0.5rem;'></div>", unsafe_allow_html=True)
+        col_url, col_scan = st.columns([4, 1])
+        with col_url:
+            auction_url = st.text_input("URL", placeholder="https://www.bidspotter.com/auctions/...",
+                                         label_visibility="collapsed", key="auction_url_new")
+        ps1, ps2 = st.columns([1, 2])
+        with ps1:
+            page_mode = st.selectbox("Pages", ["Single page", "All pages", "Page range"],
+                                      label_visibility="collapsed", key="auction_page_mode_new")
+        with ps2:
+            if page_mode == "Single page":
+                page_num = st.number_input("Page", min_value=1, value=1, step=1,
+                                            label_visibility="collapsed", key="auction_page_num_new")
+                pages_to_scan = [int(page_num)]
+            elif page_mode == "All pages":
+                st.markdown("<div style='color:#64748b; font-size:0.75rem; padding-top:8px;'>Detects all pages automatically</div>", unsafe_allow_html=True)
+                pages_to_scan = None
             else:
-                border_color = "#e2e8f0"
-                margin_label = ""
-                margin_color = "#94a3b8"
-
-            fav_color = "#dc2626" if favorited else "#e2e8f0"
-
-            st.markdown(
-                f"<div style='background:#ffffff; border:1px solid {border_color}; "
-                f"border-radius:12px; padding:0.75rem; margin-bottom:0.5rem; "
-                f"box-shadow:0 1px 3px rgba(0,0,0,0.05);'>",
-                unsafe_allow_html=True
-            )
-
-            img_col, info_col, action_col = st.columns([1, 4, 1])
-
-            with img_col:
-                if image_url:
-                    st.markdown(
-                        f"<a href='{listing_url}' target='_blank'>"
-                        f"<img src='{image_url}' style='width:100%; border-radius:8px; "
-                        f"object-fit:cover; max-height:90px; cursor:pointer;' /></a>",
-                        unsafe_allow_html=True
-                    )
-                else:
-                    st.markdown(
-                        "<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; "
-                        "height:80px; display:flex; align-items:center; justify-content:center; "
-                        "color:#94a3b8; font-size:1.2rem;'>🔨</div>",
-                        unsafe_allow_html=True
-                    )
-
-            with info_col:
-                ai_description = item.get("ai_description", "")
-                ai_confidence  = item.get("ai_confidence", "")
-                value_source   = item.get("value_source", "")
-                is_gemini      = value_source == "gemini_vision"
-
-                # Title + AI badge
-                ai_badge = ""
-                if is_gemini and val_status == "done":
-                    conf_color = {"high":"#16a34a","medium":"#d97706","low":"#dc2626"}.get(ai_confidence,"#64748b")
-                    ai_badge = f"<span style=\'background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; border-radius:4px; font-size:0.6rem; font-weight:600; padding:1px 6px; margin-left:6px;\'>🤖 AI Vision · {ai_confidence} confidence</span>"
-                elif is_gemini:
-                    ai_badge = "<span style=\'background:#eff6ff; color:#2563eb; border:1px solid #93c5fd; border-radius:4px; font-size:0.6rem; padding:1px 6px; margin-left:6px;\'>🤖 AI analyzing...</span>"
-
-                st.markdown(
-                    f"<div style=\'color:#0f172a; font-size:0.85rem; font-weight:600; "
-                    f"margin-bottom:4px; line-height:1.3;\'>{title[:120]}{ai_badge}</div>",
-                    unsafe_allow_html=True
-                )
-
-                # AI description (if available and different from title)
-                if ai_description and ai_description.lower()[:30] != title.lower()[:30]:
-                    st.markdown(
-                        f"<div style=\'color:#475569; font-size:0.76rem; margin-bottom:5px; "
-                        f"background:#f8fafc; border-left:3px solid #cbd5e1; padding:4px 8px; "
-                        f"border-radius:0 6px 6px 0;\'>📝 {ai_description}</div>",
-                        unsafe_allow_html=True
-                    )
-
-                # Price row
-                price_str = f"${cur_price:.2f}" if cur_price > 0 else "No bids"
-                time_str  = f" · ⏱ {time_left}" if time_left else ""
-
-                if val_status == "done" and val_used_hi > 0:
-                    val_str = f"Used: ${val_used_low:.0f}–${val_used_hi:.0f} &nbsp;·&nbsp; New: ${val_new_low:.0f}–${val_new_hi:.0f}"
-                    src_icon = "🤖" if is_gemini else "📦"
-                elif val_status == "pending":
-                    val_str = "⏳ Looking up value..."
-                    src_icon = ""
-                else:
-                    val_str = "Value unavailable"
-                    src_icon = ""
-
-                st.markdown(f"""
-                <div style='display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:3px;'>
-                    <span style='color:#0f172a; font-size:1rem; font-weight:700;'>{price_str}</span>
-                    <span style='color:#64748b; font-size:0.75rem;'>{time_str}</span>
-                    {f"<span style='color:{margin_color}; font-size:0.72rem; font-weight:600;'>{margin_label}</span>" if margin_label else ""}
-                </div>
-                <div style='color:#64748b; font-size:0.72rem;'>{src_icon} Est. value: {val_str}</div>
-                """, unsafe_allow_html=True)
-
-            with action_col:
-                # Favorite toggle
-                fav_label = "❤️" if favorited else "🤍"
-                if st.button(fav_label, key=f"fav_{item_id}", use_container_width=True):
-                    try:
-                        supabase.table("auction_items").update(
-                            {"favorited": not favorited}
-                        ).eq("id", item_id).execute()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed: {e}")
-
-                # View listing button
-                if listing_url:
-                    st.markdown(
-                        f"<a href='{listing_url}' target='_blank' style='display:block; "
-                        f"text-align:center; background:#eff6ff; border:1px solid #93c5fd; "
-                        f"border-radius:6px; padding:5px 8px; color:#1d4ed8; font-size:0.7rem; "
-                        f"font-weight:600; text-decoration:none; margin-top:4px;'>View ↗</a>",
-                        unsafe_allow_html=True
-                    )
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        # Clear session
-        st.divider()
-        if st.button("🗑️  Clear Results", use_container_width=True, type="secondary"):
-            if st.session_state.auction_session_id:
+                page_range = st.text_input("Range e.g. 1-5", value="1-3",
+                                            label_visibility="collapsed", key="auction_page_range_new")
                 try:
-                    supabase.table("auction_items").delete().eq(
-                        "session_id", st.session_state.auction_session_id
-                    ).execute()
+                    parts = page_range.split("-")
+                    pages_to_scan = list(range(int(parts[0]), int(parts[1]) + 1))
                 except Exception:
-                    pass
-            st.session_state.auction_session_id = None
-            st.session_state.auction_items      = []
-            st.rerun()
+                    pages_to_scan = [1]
 
-    elif not scan_clicked:
-        st.markdown("""
-        <div style='text-align:center; padding:3rem 0; color:#94a3b8;'>
-            <div style='font-size:3rem; margin-bottom:0.75rem;'>🔨</div>
-            <div style='color:#475569; font-size:1rem; font-weight:500; margin-bottom:0.4rem;'>No auction scanned yet</div>
-            <div style='font-size:0.82rem;'>
-                Paste an auction URL above and click Scan.<br>
-                Works with BidSpotter, Purple Wave, IronPlanet, GovPlanet, and more.
+        with col_scan:
+            scan_clicked = st.button("🔍  Scan", use_container_width=True, type="primary",
+                                      key="auction_scan_btn",
+                                      disabled=not (auction_url if "auction_url_new" in st.session_state else "").strip())
+
+        if scan_clicked and st.session_state.get("auction_url_new","").strip():
+            url = st.session_state.auction_url_new.strip()
+            session_id = str(uuid.uuid4())
+
+            with st.spinner("Scraping auction listings..."):
+                try:
+                    from auction_scraper import scrape_and_store, get_page_count, get_page_url
+                    if pages_to_scan is None:
+                        total_pages = get_page_count(url)
+                        pages_to_scan = list(range(1, total_pages + 1))
+
+                    item_ids = scrape_and_store(url, session_id, pages_to_scan)
+
+                    # Save session to DB
+                    label = url.split("/")[2] if "/" in url else url[:40]
+                    supabase.table("auction_sessions").insert({
+                        "session_id":  session_id,
+                        "source_url":  url,
+                        "label":       label,
+                        "item_count":  len(item_ids),
+                        "created_at":  datetime.now().isoformat(),
+                        "last_refreshed": datetime.now().isoformat(),
+                    }).execute()
+
+                    st.session_state.auction_active_session = session_id
+                    st.session_state.auction_auto_enrich    = True
+                    st.session_state.auction_enrich_ids     = item_ids
+                    st.cache_data.clear()
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Scan failed: {e}")
+
+    # ---- Active session view ------------------------------------- #
+    else:
+        session_id = st.session_state.auction_active_session
+        session_info = next((s for s in sessions if s["session_id"] == session_id), None)
+        items = fetch_auction_items(session_id)
+
+        # Auto-enrich if just scanned
+        if st.session_state.get("auction_auto_enrich") and items:
+            st.session_state.auction_auto_enrich = False
+            ids = st.session_state.get("auction_enrich_ids", [i["id"] for i in items if i.get("value_status") == "pending"])
+            total_e = len(ids)
+            if total_e > 0:
+                prog = st.progress(0, text=f"Researching {total_e} items across the web...")
+                def update_prog(done, total, title):
+                    prog.progress(done/total, text=f"Researching {done}/{total}: {title[:40]}...")
+                try:
+                    from auction_scraper import enrich_values
+                    enrich_values(ids, progress_callback=update_prog)
+                    prog.empty()
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    prog.empty()
+                    st.error(f"Value lookup failed: {e}")
+
+        # Session action bar
+        source_url = session_info.get("source_url","") if session_info else ""
+        last_ref   = session_info.get("last_refreshed","")[:10] if session_info else ""
+        total_items   = len(items)
+        valued_items  = sum(1 for i in items if i.get("value_status") == "done")
+        favorited_cnt = sum(1 for i in items if i.get("favorited"))
+
+        st.markdown(f"""
+        <div style='background:#ffffff; border:1px solid #e2e8f0; border-radius:10px;
+        padding:0.65rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
+            <div>
+                <div style='color:#0f172a; font-size:0.82rem; font-weight:600; margin-bottom:2px;'>{source_url[:60]}</div>
+                <div style='color:#94a3b8; font-size:0.7rem;'>
+                    {total_items} listings · {valued_items} valued · {favorited_cnt} favorited · last refreshed {last_ref}
+                </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-st.markdown("</div>", unsafe_allow_html=True)
-with t2:
-    st.markdown("<div class='tab-camera'>", unsafe_allow_html=True)
-    if st.button("📸  Scan New Items", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "camera" else "secondary"):
-        st.session_state.active_tab = "camera"
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-with t3:
-    st.markdown("<div class='tab-batch'>", unsafe_allow_html=True)
-    if st.button("📁  Batch Upload", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "batch" else "secondary"):
-        st.session_state.active_tab = "batch"
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-with t4:
-    st.markdown("<div class='tab-research'>", unsafe_allow_html=True)
-    if st.button("🔍  Research", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "research" else "secondary"):
-        st.session_state.active_tab = "research"
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-with t5:
-    st.markdown("<div class='tab-auction'>", unsafe_allow_html=True)
-    if st.button("🔨  Auction Scanner", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "auction" else "secondary"):
-        st.session_state.active_tab = "auction"
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-with t6:
-    with st.popover("⬇️  Download Spreadsheet", use_container_width=True):
-        st.markdown("<div style='padding:4px 0;'>", unsafe_allow_html=True)
-        if not df_top.empty:
-            csv_df = df_top.copy()
-            if "created_at" in csv_df.columns:
-                csv_df["created_at"] = csv_df["created_at"].astype(str)
-            st.download_button(
-                label="📄  Raw Data Spreadsheet",
-                data=csv_df.to_csv(index=False).encode("utf-8"),
-                file_name="listerai_inventory.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-            st.download_button(
-                label="🛒  eBay Upload Sheet",
-                data=build_ebay_csv(df_top),
-                file_name=f"listerai_ebay_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
+        # Action buttons
+        ac1, ac2, ac3 = st.columns([2, 2, 1])
+        with ac1:
+            if st.button("🔄  Refresh Scan", use_container_width=True, type="primary", key="auction_refresh"):
+                with st.spinner("Re-scraping and updating values..."):
+                    try:
+                        from auction_scraper import scrape_and_store, get_page_count, enrich_values
+                        # Delete old items for this session
+                        supabase.table("auction_items").delete().eq("session_id", session_id).execute()
+                        # Re-scrape
+                        new_ids = scrape_and_store(source_url, session_id, [1])
+                        # Update session
+                        supabase.table("auction_sessions").update({
+                            "item_count":     len(new_ids),
+                            "last_refreshed": datetime.now().isoformat(),
+                        }).eq("session_id", session_id).execute()
+                        # Re-enrich
+                        st.session_state.auction_auto_enrich = True
+                        st.session_state.auction_enrich_ids  = new_ids
+                        st.cache_data.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Refresh failed: {e}")
+        with ac2:
+            pending = [i for i in items if i.get("value_status") == "pending"]
+            if pending:
+                if st.button(f"🔄  Retry Values ({len(pending)} pending)", use_container_width=True,
+                              type="secondary", key="auction_retry_values"):
+                    st.session_state.auction_auto_enrich = True
+                    st.session_state.auction_enrich_ids  = [i["id"] for i in pending]
+                    st.rerun()
+        with ac3:
+            if st.button("🗑️  Delete", use_container_width=True, type="secondary", key="auction_delete"):
+                try:
+                    supabase.table("auction_items").delete().eq("session_id", session_id).execute()
+                    supabase.table("auction_sessions").delete().eq("session_id", session_id).execute()
+                    st.session_state.auction_active_session = None
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Delete failed: {e}")
+
+        if not items:
+            st.info("No items found for this scan.")
         else:
-            st.markdown("<div style='color:#9ca3af; font-size:0.82rem;'>No items in batch yet.</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+            # Stats
+            as1, as2, as3, as4 = st.columns(4)
+            for col, val, label, color in [
+                (as1, str(total_items),   "Listings",   "#b45309"),
+                (as2, str(valued_items),  "Valued",     "#0891b2"),
+                (as3, str(total_items - valued_items), "Pending", "#94a3b8"),
+                (as4, str(favorited_cnt), "Favorited",  "#dc2626"),
+            ]:
+                with col:
+                    st.markdown(f"""
+                    <div style='background:#ffffff; border:1px solid #e2e8f0; border-top:3px solid {color};
+                    border-radius:10px; padding:0.65rem 1rem; margin-bottom:0.75rem;'>
+                        <div style='color:#0f172a; font-size:1.5rem; font-weight:700; line-height:1;'>{val}</div>
+                        <div style='color:#64748b; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>{label}</div>
+                    </div>""", unsafe_allow_html=True)
+
+            # Filter / sort
+            f1, f2, f3 = st.columns([3, 1, 1])
+            with f1:
+                search_q = st.text_input("Search", placeholder="Filter by title...",
+                                          label_visibility="collapsed", key="auction_search")
+            with f2:
+                show_fav = st.checkbox("Favorites only", key="auction_fav_only")
+            with f3:
+                sort_by = st.selectbox("Sort", ["Default","Price ↑","Price ↓","Value ↑"],
+                                        label_visibility="collapsed", key="auction_sort")
+
+            filtered = items.copy()
+            if search_q:
+                filtered = [i for i in filtered if search_q.lower() in i.get("title","").lower()]
+            if show_fav:
+                filtered = [i for i in filtered if i.get("favorited")]
+            if sort_by == "Price ↑":
+                filtered.sort(key=lambda x: x.get("current_price",0))
+            elif sort_by == "Price ↓":
+                filtered.sort(key=lambda x: x.get("current_price",0), reverse=True)
+            elif sort_by == "Value ↑":
+                filtered.sort(key=lambda x: x.get("value_used_high",0))
+
+            st.markdown(f"<p style='color:#94a3b8; font-size:0.75rem; margin-bottom:0.5rem;'>Showing {len(filtered)} of {total_items} listings</p>",
+                        unsafe_allow_html=True)
+
+            # Item cards
+            for item in filtered:
+                item_id       = item.get("id","")
+                title         = item.get("title","Unknown")
+                cur_price     = float(item.get("current_price",0) or 0)
+                time_left     = item.get("time_left","")
+                image_url     = item.get("image_url","")
+                listing_url   = item.get("listing_url","")
+                val_used_low  = float(item.get("value_used_low",0) or 0)
+                val_used_hi   = float(item.get("value_used_high",0) or 0)
+                val_new_low   = float(item.get("value_new_low",0) or 0)
+                val_new_hi    = float(item.get("value_new_high",0) or 0)
+                val_status    = item.get("value_status","pending")
+                favorited     = item.get("favorited",False)
+                ai_desc       = item.get("ai_description","")
+                ai_conf       = item.get("ai_confidence","")
+                val_source    = item.get("value_source","")
+                is_gemini     = val_source == "gemini_vision"
+
+                margin = (val_used_hi - cur_price) if val_used_hi > 0 else 0
+                if val_status == "done" and val_used_hi > 0:
+                    border_color = "#16a34a" if margin > 0 else "#dc2626"
+                    margin_label = f"↑ ${margin:.0f} margin" if margin > 0 else f"↓ ${abs(margin):.0f} above market"
+                    margin_color = "#16a34a" if margin > 0 else "#dc2626"
+                else:
+                    border_color = "#e2e8f0"
+                    margin_label = ""
+                    margin_color = "#94a3b8"
+
+                st.markdown(
+                    f"<div style='background:#ffffff; border:1px solid {border_color}; "
+                    f"border-radius:12px; padding:0.75rem; margin-bottom:0.5rem; "
+                    f"box-shadow:0 1px 3px rgba(0,0,0,0.05);'>",
+                    unsafe_allow_html=True
+                )
+
+                img_col, info_col, action_col = st.columns([1, 4, 1])
+                with img_col:
+                    if image_url:
+                        st.markdown(
+                            f"<a href='{listing_url}' target='_blank'>"
+                            f"<img src='{image_url}' style='width:100%; border-radius:8px; "
+                            f"object-fit:cover; max-height:90px; cursor:pointer;'/></a>",
+                            unsafe_allow_html=True)
+                    else:
+                        st.markdown("<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; height:80px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.2rem;'>🔨</div>", unsafe_allow_html=True)
+
+                with info_col:
+                    ai_badge = ""
+                    if is_gemini and val_status == "done":
+                        conf_color = {"high":"#16a34a","medium":"#d97706","low":"#dc2626"}.get(ai_conf,"#64748b")
+                        ai_badge = f"<span style=\'background:#f0fdf4; color:{conf_color}; border:1px solid #bbf7d0; border-radius:4px; font-size:0.6rem; font-weight:600; padding:1px 6px; margin-left:6px;\'>🤖 AI Vision</span>"
+
+                    st.markdown(f"<div style=\'color:#0f172a; font-size:0.85rem; font-weight:600; margin-bottom:4px; line-height:1.3;\'>{title[:120]}{ai_badge}</div>", unsafe_allow_html=True)
+
+                    if ai_desc and ai_desc.lower()[:30] != title.lower()[:30]:
+                        st.markdown(f"<div style=\'color:#475569; font-size:0.76rem; margin-bottom:5px; background:#f8fafc; border-left:3px solid #cbd5e1; padding:4px 8px; border-radius:0 6px 6px 0;\'>📝 {ai_desc}</div>", unsafe_allow_html=True)
+
+                    price_str = f"${cur_price:.2f}" if cur_price > 0 else "No bids"
+                    time_str  = f" · ⏱ {time_left}" if time_left else ""
+                    if val_status == "done" and val_used_hi > 0:
+                        val_str  = f"Used: ${val_used_low:.0f}–${val_used_hi:.0f} &nbsp;·&nbsp; New: ${val_new_low:.0f}–${val_new_hi:.0f}"
+                        src_icon = "🤖" if is_gemini else "📦"
+                    elif val_status == "pending":
+                        val_str = "⏳ Looking up value..."
+                        src_icon = ""
+                    else:
+                        val_str  = "Value unavailable"
+                        src_icon = ""
+
+                    st.markdown(f"""
+                    <div style='display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:3px;'>
+                        <span style='color:#0f172a; font-size:1rem; font-weight:700;'>{price_str}</span>
+                        <span style='color:#64748b; font-size:0.75rem;'>{time_str}</span>
+                        {f"<span style='color:{margin_color}; font-size:0.72rem; font-weight:600;'>{margin_label}</span>" if margin_label else ""}
+                    </div>
+                    <div style='color:#64748b; font-size:0.72rem;'>{src_icon} Est. value: {val_str}</div>
+                    """, unsafe_allow_html=True)
+
+                with action_col:
+                    fav_label = "❤️" if favorited else "🤍"
+                    if st.button(fav_label, key=f"fav_{item_id}", use_container_width=True):
+                        try:
+                            supabase.table("auction_items").update({"favorited": not favorited}).eq("id", item_id).execute()
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed: {e}")
+                    if listing_url:
+                        st.markdown(
+                            f"<a href='{listing_url}' target='_blank' style='display:block; text-align:center; "
+                            f"background:#eff6ff; border:1px solid #93c5fd; border-radius:6px; padding:5px 8px; "
+                            f"color:#1d4ed8; font-size:0.7rem; font-weight:600; text-decoration:none; margin-top:4px;'>View ↗</a>",
+                            unsafe_allow_html=True)
+
+                st.markdown("</div>", unsafe_allow_html=True)
+
+    if not sessions and st.session_state.auction_active_session is None:
+        st.markdown("""
+        <div style='text-align:center; padding:3rem 0; color:#94a3b8;'>
+            <div style='font-size:3rem; margin-bottom:0.75rem;'>🔨</div>
+            <div style='color:#475569; font-size:1rem; font-weight:500; margin-bottom:0.4rem;'>No auction scanned yet</div>
+            <div style='font-size:0.82rem;'>Paste an auction URL above and click Scan.<br>Works with BidSpotter, Purple Wave, IronPlanet, GovPlanet, and more.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div class='page-content'>", unsafe_allow_html=True)
