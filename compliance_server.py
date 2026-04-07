@@ -27,8 +27,9 @@ async def ebay_challenge(request: Request):
         return Response(status_code=400)
 
     # Hash: SHA-256(challenge_code + verification_token + endpoint_url)
-    endpoint_url = str(request.url).split("?")[0]
-    
+    # Hardcode the endpoint URL to ensure exact match with what eBay has registered
+    endpoint_url = "https://ebay-compliance-production.up.railway.app/ebay/deletion"
+
     hash_input = challenge_code + VERIFICATION_TOKEN + endpoint_url
     digest = hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
 
