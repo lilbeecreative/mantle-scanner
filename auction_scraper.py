@@ -27,22 +27,37 @@ HEADERS = {
 
 _gemini_client = None
 _gemini_model  = None
+FALLBACK_MODEL = "models/gemini-2.5-flash"
 
 def get_gemini():
     global _gemini_client, _gemini_model
+    from google import genai
     if _gemini_client is None:
-        from google import genai
         _gemini_client = genai.Client(api_key=GEMINI_KEY)
         try:
-            models = [m.name for m in _gemini_client.models.list()]
-            _gemini_model = next(
-                (m for m in models if "gemini-2.0-flash" in m),
-                next((m for m in models if "gemini-2.0" in m),
-                next((m for m in models if "gemini-1.5-pro" in m),
-                "models/gemini-2.0-flash"))
-            )
-        except Exception:
-            _gemini_model = "models/gemini-2.0-flash"
+            all_models = [m.name for m in _gemini_client.models.list()]
+            # Filter to generative models only
+            gen_models = [m for m in all_models if "gemini" in m.lower()]
+            print(f"Available Gemini models: {gen_models}")
+            # Priority order
+            preferred = [
+                "gemini-2.5-pro", "gemini-2.5-flash",
+                "gemini-2.0-pro", "gemini-2.0-flash-001",
+                "gemini-2.0-flash-exp", "gemini-1.5-pro",
+                "gemini-1.5-flash", "gemini-pro"
+            ]
+            _gemini_model = None
+            for pref in preferred:
+                match = next((m for m in gen_models if pref in m), None)
+                if match:
+                    _gemini_model = match
+                    break
+            if not _gemini_model:
+                _gemini_model = gen_models[0] if gen_models else "models/gemini-1.5-pro"
+            print(f"Selected Gemini model: {_gemini_model}")
+        except Exception as e:
+            print(f"Model list error: {e}")
+            _gemini_model = FALLBACK_MODEL
     return _gemini_client, _gemini_model
 
 # ------------------------------------------------------------------ #
