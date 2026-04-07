@@ -16,8 +16,9 @@ from PIL.ExifTags import TAGS
 # ------------------------------------------------------------------ #
 
 load_dotenv()
-url     = os.getenv("SUPABASE_URL")
-key     = os.getenv("SUPABASE_KEY")
+url         = os.getenv("SUPABASE_URL")
+key         = os.getenv("SUPABASE_KEY")
+EBAY_APP_ID = os.getenv("EBAY_APP_ID", "")
 api_key = os.getenv("GEMINI_KEY") or os.getenv("GEMINI_API_KEY")
 
 if not all([url, key, api_key]):
@@ -56,17 +57,25 @@ def resolve_model():
     print("🔍 Finding best available model...")
     try:
         all_models = [m.name for m in client.models.list()]
-        for pref in ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"]:
-            match = next((m for m in all_models if pref in m), None)
+        gen_models = [m for m in all_models if "gemini" in m.lower()]
+        print(f"Available models: {gen_models}")
+        preferred = [
+            "gemini-2.5-pro", "gemini-2.5-flash",
+            "gemini-2.0-pro", "gemini-2.0-flash-001",
+            "gemini-2.0-flash-exp", "gemini-1.5-pro",
+            "gemini-1.5-flash", "gemini-pro"
+        ]
+        for pref in preferred:
+            match = next((m for m in gen_models if pref in m), None)
             if match:
                 print(f"✅ Using model: {match}")
                 return match
-        if all_models:
-            print(f"✅ Using model: {all_models[0]}")
-            return all_models[0]
+        if gen_models:
+            print(f"✅ Using model: {gen_models[0]}")
+            return gen_models[0]
     except Exception as e:
         print(f"⚠️  Model list failed: {e}")
-    return "models/gemini-1.5-flash"
+    return "models/gemini-1.5-pro"
 
 model = resolve_model()
 
@@ -151,40 +160,163 @@ def parse_int(val):
         return 0
 
 # ------------------------------------------------------------------ #
+#  EBAY FINDING API — SOLD + ACTIVE LISTINGS
+# ------------------------------------------------------------------ #
+
+import requests as _requests
+
+def _ebay_find(operation: str, keywords: str, extra_params: dict = {}) -> list[dict]:
+    """
+    Call eBay Finding API and return list of item dicts with price + title + url.
+    operation: findCompletedItems | findItemsAdvanced
+    """
+    if not EBAY_APP_ID or "SBX" in EBAY_APP_ID:
+        return []
+    short_kw = " ".join(keywords.split()[:7])
+    params = {
+        "OPERATION-NAME":               operation,
+        "SERVICE-VERSION":              "1.0.0",
+        "SECURITY-APPNAME":             EBAY_APP_ID,
+        "RESPONSE-DATA-FORMAT":         "JSON",
+        "keywords":                     short_kw,
+        "sortOrder":                    "EndTimeSoonest",
+        "paginationInput.entriesPerPage": "20",
+        **extra_params
+    }
+    try:
+        resp = _requests.get(
+            "https://svcs.ebay.com/services/search/FindingService/v1",
+            params=params, timeout=12
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        key  = operation + "Response"
+        items = (data.get(key, [{}])[0]
+                     .get("searchResult", [{}])[0]
+                     .get("item", []))
+        results = []
+        for item in items:
+            try:
+                price  = float(item["sellingStatus"][0]["currentPrice"][0]["__value__"])
+                title  = item.get("title", [""])[0]
+                url    = item.get("viewItemURL", [""])[0]
+                cond   = item.get("condition", [{}])[0].get("conditionDisplayName", [""])[0]
+                results.append({"price": price, "title": title, "url": url, "condition": cond})
+            except Exception:
+                continue
+        return results
+    except Exception as e:
+        print(f"   eBay API error ({operation}): {e}")
+        return []
+
+
+def fetch_ebay_prices(title: str) -> dict:
+    """
+    Fetch both sold and active eBay listings for a title.
+    Returns dict with sold_used, sold_new, active_used, active_new price lists
+    and a formatted summary string for the Gemini prompt.
+    """
+    # Sold listings (completed)
+    sold_all = _ebay_find(
+        "findCompletedItems", title,
+        {"itemFilter(0).name": "SoldItemsOnly", "itemFilter(0).value": "true"}
+    )
+    # Active BIN listings
+    active_all = _ebay_find(
+        "findItemsAdvanced", title,
+        {"itemFilter(0).name": "ListingType", "itemFilter(0).value": "FixedPrice"}
+    )
+
+    def split_cond(items):
+        used = [i["price"] for i in items if "used" in i.get("condition","").lower() or "refurb" in i.get("condition","").lower()]
+        new  = [i["price"] for i in items if "new" in i.get("condition","").lower()]
+        other = [i["price"] for i in items if i not in used and i not in new]
+        # If no condition split, put all in used bucket
+        if not used and not new:
+            used = [i["price"] for i in items]
+        return used, new
+
+    sold_used_prices, sold_new_prices   = split_cond(sold_all)
+    active_used_prices, active_new_prices = split_cond(active_all)
+
+    def fmt(prices, label):
+        if not prices:
+            return f"{label}: no data"
+        lo, hi, avg = min(prices), max(prices), sum(prices)/len(prices)
+        return f"{label}: low ${lo:.2f}, high ${hi:.2f}, avg ${avg:.2f} ({len(prices)} listings)"
+
+    summary_lines = []
+    if sold_all or active_all:
+        summary_lines.append("=== REAL eBay MARKET DATA (use these for pricing) ===")
+        summary_lines.append(fmt(sold_used_prices,   "Sold USED"))
+        summary_lines.append(fmt(sold_new_prices,    "Sold NEW"))
+        summary_lines.append(fmt(active_used_prices, "Active BIN USED"))
+        summary_lines.append(fmt(active_new_prices,  "Active BIN NEW"))
+        # Sample titles so Gemini can see what sold
+        if sold_all:
+            summary_lines.append("Recent sold examples: " + " | ".join(
+                f'"{i["title"][:50]}" ${i["price"]:.2f}' for i in sold_all[:3]
+            ))
+        if active_all:
+            summary_lines.append("Active listing examples: " + " | ".join(
+                f'"{i["title"][:50]}" ${i["price"]:.2f}' for i in active_all[:3]
+            ))
+        summary_lines.append("=====================================================")
+
+    return {
+        "sold_used":    sold_used_prices,
+        "sold_new":     sold_new_prices,
+        "active_used":  active_used_prices,
+        "active_new":   active_new_prices,
+        "summary":      "\n".join(summary_lines) if summary_lines else "",
+        "has_data":     bool(sold_all or active_all),
+    }
+
+# ------------------------------------------------------------------ #
 #  GEMINI PROMPT
 # ------------------------------------------------------------------ #
 
-def make_prompt(photo_count: int, condition: str = "used") -> str:
+def make_prompt(photo_count: int, condition: str = "used", ebay_data: dict = None) -> str:
+    ebay_section = ""
+    if ebay_data and ebay_data.get("has_data"):
+        ebay_section = f"""
+{ebay_data["summary"]}
+
+Use the eBay market data above as your PRIMARY source for pricing.
+Prioritize sold listings over active listings for pricing accuracy.
+"""
+    else:
+        ebay_section = """
+No eBay API data available — use your Google Search tool to find current eBay sold and active listings.
+Search for both USED and NEW condition prices separately.
+"""
+
     return f"""You are a JSON-only resale pricing expert analyzing {photo_count} photo(s) of the same item.
 
-Step 1 — Identify the item. Read any visible text, brand names, model numbers, or part numbers.
+Step 1 — Identify the item precisely. Read every visible brand name, model number, part number, and spec.
 
-Step 2 — Search eBay SOLD listings and find:
-- The price range for USED condition sold listings
-- The price range for NEW condition sold listings
-- If no used listings exist, set used prices to 0
-- If no new listings exist, set new prices to 0
-
+Step 2 — Use the pricing data below to determine accurate market values.
+{ebay_section}
 The item was marked as condition: {condition} by the employee scanning it.
 
 Return ONLY a raw JSON object, no markdown, no backticks:
 
 {{
-  "title": "eBay listing title under 80 characters, keyword-rich",
+  "title": "eBay listing title under 80 characters, specific and keyword-rich with brand and model",
   "ebay_category": "full eBay category path",
   "ebay_category_id": "numeric eBay category ID only",
   "weight_oz": "estimated weight in ounces as number only",
   "weight_lb": "estimated weight in pounds as number only",
-  "price_used_low": "lowest USED sold price as number only, 0 if none found",
-  "price_used_high": "highest USED sold price as number only, 0 if none found",
-  "price_used": "suggested listing price for USED condition as number only, 0 if none found",
-  "price_new_low": "lowest NEW sold price as number only, 0 if none found",
-  "price_new_high": "highest NEW sold price as number only, 0 if none found",
-  "price_new": "suggested listing price for NEW condition as number only, 0 if none found"
+  "price_used_low": lowest USED price found as number only — 0 if none,
+  "price_used_high": highest USED price found as number only — 0 if none,
+  "price_used": recommended listing price for USED condition as number only — 0 if none,
+  "price_new_low": lowest NEW price found as number only — 0 if none,
+  "price_new_high": highest NEW price found as number only — 0 if none,
+  "price_new": recommended listing price for NEW condition as number only — 0 if none
 }}
 
 If you cannot identify the item use "Unknown Item" for title and 0 for all numeric fields.
-Always search before answering. Never return placeholder text."""
+Never return placeholder text. Be specific with the title — include brand, model, size, specs."""
 
 # ------------------------------------------------------------------ #
 #  PROCESS A GROUP
@@ -261,16 +393,46 @@ def process_group(group: dict):
         supabase.table("listing_groups").update({"status": "error"}).eq("id", group_id).execute()
         return
 
-    prompt = make_prompt(len(image_parts), condition)
-    print(f"   🤖 Sending {len(image_parts)} photos to Gemini...")
+    # ---- STEP 1: Quick ID pass to get title for eBay lookup ----
+    print(f"   🔍 Step 1: Identifying item from photos...")
+    title_for_ebay = "Unknown Item"
+    try:
+        id_prompt = """Look at this item and return ONLY a JSON object:
+{"title": "brand model number specs as a concise eBay search query under 60 chars"}
+No markdown, no backticks, just JSON."""
+        id_resp = client.models.generate_content(model=model, contents=[*image_parts, id_prompt])
+        id_raw  = re.sub(r"^```[a-z]*\n?", "", id_resp.text.strip(), flags=re.IGNORECASE)
+        id_raw  = re.sub(r"\n?```$", "", id_raw).strip()
+        title_for_ebay = str(json.loads(id_raw).get("title", "Unknown Item")).strip()
+        print(f"   🏷️  Identified: {title_for_ebay}")
+    except Exception as e:
+        print(f"   ⚠️  ID pass failed: {e}")
+
+    # ---- STEP 2: Fetch real eBay prices (sold + active) ----
+    ebay_data = {}
+    if title_for_ebay != "Unknown Item":
+        print(f"   📦 Fetching eBay sold + active listings...")
+        ebay_data = fetch_ebay_prices(title_for_ebay)
+        if ebay_data.get("has_data"):
+            sc = len(ebay_data.get("sold_used",[])) + len(ebay_data.get("sold_new",[]))
+            ac = len(ebay_data.get("active_used",[])) + len(ebay_data.get("active_new",[]))
+            print(f"   ✅ eBay: {sc} sold, {ac} active listings found")
+        else:
+            print(f"   ⚠️  No eBay data — Gemini will search web")
+
+    # ---- STEP 3: Full Gemini pass with real eBay data injected ----
+    prompt = make_prompt(len(image_parts), condition, ebay_data)
+    use_search = not ebay_data.get("has_data")
+    print(f"   🤖 Step 3: Gemini pricing pass (web search: {use_search})...")
 
     try:
+        cfg = types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())] if use_search else []
+        )
         response = client.models.generate_content(
             model=model,
             contents=[*image_parts, prompt],
-            config=types.GenerateContentConfig(
-                tools=[types.Tool(google_search=types.GoogleSearch())]
-            )
+            config=cfg
         )
 
         raw = response.text.strip()
