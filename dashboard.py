@@ -374,7 +374,7 @@ def submit_to_ebay(item: dict) -> dict:
     quantity   = int(item.get("quantity", 1) or 1)
 
     # Schedule 29 days from now (appears as draft in Seller Hub)
-    schedule_time = (datetime.now(timezone.utc) + timedelta(days=29)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    schedule_time = (datetime.now(timezone.utc) + timedelta(days=19)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     # Full description
     item_desc  = item.get("description", "") or ""
@@ -405,9 +405,17 @@ def submit_to_ebay(item: dict) -> dict:
     <BestOfferDetails>
       <BestOfferEnabled>true</BestOfferEnabled>
     </BestOfferDetails>
-    <ReturnPolicy>
-      <ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption>
-    </ReturnPolicy>
+    <SellerProfiles>
+      <SellerShippingProfile>
+        <ShippingProfileID>215936699022</ShippingProfileID>
+      </SellerShippingProfile>
+      <SellerReturnProfile>
+        <ReturnProfileID>139181210022</ReturnProfileID>
+      </SellerReturnProfile>
+      <SellerPaymentProfile>
+        <PaymentProfileID>258479922022</PaymentProfileID>
+      </SellerPaymentProfile>
+    </SellerProfiles>
     {f"<PictureDetails><PictureURL>{photo_url}</PictureURL></PictureDetails>" if photo_url else ""}
     <ScheduleTime>{schedule_time}</ScheduleTime>
     <SKU></SKU>
