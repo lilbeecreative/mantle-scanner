@@ -1041,7 +1041,7 @@ elif st.session_state.active_tab == "dashboard":
 
             chk_col, img_col, fields_col = st.columns([0.3, 1, 4])
             with chk_col:
-                checked = st.checkbox("", value=is_selected, key=f"chk_{item_id}",
+                checked = st.checkbox("Select", value=is_selected, key=f"chk_{item_id}",
                                        label_visibility="collapsed")
                 if checked != is_selected:
                     st.session_state.ebay_selected[item_id] = checked
