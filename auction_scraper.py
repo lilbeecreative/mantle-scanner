@@ -201,7 +201,9 @@ Rules:
             config=types.GenerateContentConfig(max_output_tokens=500)
         )
 
-        raw = response.text.strip()
+        raw = (response.text or "").strip()
+        if not raw:
+            return {}
         raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.IGNORECASE)
         raw = re.sub(r"\n?```$", "", raw).strip()
         # Sometimes Gemini wraps in extra text — find the JSON block
