@@ -233,53 +233,94 @@ All values as numbers only."""
 #  eBay FINDING API (Production — swap in when PRD key is available)
 # ------------------------------------------------------------------ #
 
+def _ebay_search(operation: str, short_title: str, extra_params: dict) -> list[float]:
+    """Run one eBay Finding API search and return list of prices."""
+    params = {
+        "OPERATION-NAME":                operation,
+        "SERVICE-VERSION":               "1.0.0",
+        "SECURITY-APPNAME":              EBAY_APP_ID,
+        "RESPONSE-DATA-FORMAT":          "JSON",
+        "keywords":                      short_title,
+        "sortOrder":                     "EndTimeSoonest",
+        "paginationInput.entriesPerPage": "10",
+    }
+    params.update(extra_params)
+    resp = requests.get(
+        "https://svcs.ebay.com/services/search/FindingService/v1",
+        params=params, timeout=10
+    )
+    data = resp.json()
+    key  = f"{operation}Response"
+    items = (data.get(key, [{}])[0]
+                 .get("searchResult", [{}])[0]
+                 .get("item", []))
+    prices = []
+    for item in items:
+        try:
+            price = float(item["sellingStatus"][0]["currentPrice"][0]["__value__"])
+            if price > 0:
+                prices.append(price)
+        except Exception:
+            continue
+    return prices
+
 def lookup_ebay_api(title: str) -> dict | None:
     """
-    Query the eBay Finding API for completed/sold listings.
+    Query the eBay Finding API for BOTH sold/completed AND active listings.
+    Combines both datasets to give a realistic value range.
     Returns None if no production key is configured.
     """
     if not EBAY_APP_ID or "SBX" in EBAY_APP_ID:
-        return None  # sandbox key or not set — skip
+        return None
 
     try:
         short_title = " ".join(title.split()[:6])
-        resp = requests.get(
-            "https://svcs.ebay.com/services/search/FindingService/v1",
-            params={
-                "OPERATION-NAME":          "findCompletedItems",
-                "SERVICE-VERSION":         "1.0.0",
-                "SECURITY-APPNAME":        EBAY_APP_ID,
-                "RESPONSE-DATA-FORMAT":    "JSON",
-                "keywords":                short_title,
-                "sortOrder":               "EndTimeSoonest",
-                "paginationInput.entriesPerPage": "10",
-                "itemFilter(0).name":      "SoldItemsOnly",
-                "itemFilter(0).value":     "true",
-            },
-            timeout=10
+
+        # 1. Sold / completed listings (most accurate for value)
+        sold_prices = _ebay_search(
+            "findCompletedItems", short_title,
+            {"itemFilter(0).name": "SoldItemsOnly", "itemFilter(0).value": "true"}
         )
-        data = resp.json()
-        items = (data.get("findCompletedItemsResponse", [{}])[0]
-                     .get("searchResult", [{}])[0]
-                     .get("item", []))
-        prices = []
-        for item in items:
-            try:
-                price = float(item["sellingStatus"][0]["currentPrice"][0]["__value__"])
-                prices.append(price)
-            except Exception:
-                continue
-        if prices:
-            low  = round(min(prices), 2)
-            high = round(max(prices), 2)
-            return {
-                "value_used_low":  low,
-                "value_used_high": high,
-                "value_new_low":   round(high * 1.2, 2),
-                "value_new_high":  round(high * 1.5, 2),
-                "value_status":    "done",
-                "value_source":    "ebay_api",
-            }
+
+        # 2. Active BIN listings (shows current market ask price)
+        active_prices = _ebay_search(
+            "findItemsByKeywords", short_title,
+            {"itemFilter(0).name": "ListingType", "itemFilter(0).value": "FixedPrice"}
+        )
+
+        print(f"  eBay sold prices: {sold_prices}")
+        print(f"  eBay active prices: {active_prices}")
+
+        if not sold_prices and not active_prices:
+            return None
+
+        all_prices = sold_prices + active_prices
+
+        # Sold prices = realistic value, active prices = asking price
+        # Used value based on sold comps, new value based on active listings
+        if sold_prices:
+            used_low  = round(min(sold_prices), 2)
+            used_high = round(max(sold_prices), 2)
+        else:
+            used_low  = round(min(all_prices) * 0.7, 2)
+            used_high = round(max(all_prices) * 0.8, 2)
+
+        if active_prices:
+            new_low  = round(min(active_prices), 2)
+            new_high = round(max(active_prices), 2)
+        else:
+            new_low  = round(used_high * 1.2, 2)
+            new_high = round(used_high * 1.5, 2)
+
+        return {
+            "value_used_low":  used_low,
+            "value_used_high": used_high,
+            "value_new_low":   new_low,
+            "value_new_high":  new_high,
+            "value_status":    "done",
+            "value_source":    "ebay_api",
+            "ai_description":  f"eBay: {len(sold_prices)} sold comps, {len(active_prices)} active listings",
+        }
     except Exception as e:
         print(f"eBay API error: {e}")
     return None
