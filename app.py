@@ -213,17 +213,35 @@ st.markdown("""
     .tab-auction   [data-testid="baseButton-primary"] { background: #b45309 !important; }
     .tab-settings  [data-testid="baseButton-primary"] { background: #475569 !important; }
 
-    /* Expander label dark mode */
+    /* Start scanning button - green with glow */
+    div[data-testid="stButton"]:has(> button[kind="primary"]) button[kind="primary"] {
+        transition: box-shadow 0.2s ease;
+    }
+    /* Expander dark mode - high contrast */
+    [data-testid="stExpander"] {
+        background: #1e2130 !important;
+        border: 1px solid #3d4663 !important;
+        border-radius: 8px !important;
+    }
+    [data-testid="stExpander"] summary {
+        background: #2d3348 !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+    }
     [data-testid="stExpander"] summary span p {
-        color: #94a3b8 !important;
+        color: #e2e8f0 !important;
         font-size: 12px !important;
         font-weight: 600 !important;
     }
-    [data-testid="stExpander"] summary:hover span p {
-        color: #e2e8f0 !important;
+    [data-testid="stExpander"] summary:hover {
+        background: #3d4663 !important;
     }
     [data-testid="stExpander"] summary svg {
-        fill: #64748b !important;
+        fill: #94a3b8 !important;
+    }
+    [data-testid="stExpander"] > div > div {
+        background: #1e2130 !important;
+        padding: 8px 4px !important;
     }
     /* Tile grid quantity buttons */
     [data-testid="stButton"] button[kind="secondary"]:has(> div > p:only-child) {
@@ -409,10 +427,14 @@ def append_to_archive(df: pd.DataFrame):
                 record["created_at"] = record["created_at"].isoformat()
             writer.writerow(record)
 
-def photo_url(photo_id: str) -> str:
+def photo_url(photo_id: str, thumb: bool = False) -> str:
     if not photo_id or str(photo_id) in ("0", "", "nan"):
         return ""
-    return f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
+    base = f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
+    if thumb:
+        # Supabase image transform — 300px wide thumbnail, much faster to load
+        return f"{SUPABASE_URL}/storage/v1/render/image/public/part-photos/{photo_id}?width=300&quality=70"
+    return base
 
 # ------------------------------------------------------------------ #
 #  eBay TRADING API — SUBMIT LISTING AS DRAFT (SCHEDULED)
@@ -1037,6 +1059,24 @@ elif st.session_state.active_tab == "batch":
         st.markdown("<div style='height:0.75rem;'></div>", unsafe_allow_html=True)
 
         # Big start button
+        st.markdown("""
+        <style>
+        .start-scan-btn button {
+            background: #16a34a !important;
+            border-color: #15803d !important;
+            box-shadow: 0 4px 18px rgba(22,163,74,0.45) !important;
+            font-size: 17px !important;
+            font-weight: 700 !important;
+            height: 58px !important;
+            letter-spacing: -0.2px !important;
+        }
+        .start-scan-btn button:hover {
+            background: #15803d !important;
+            box-shadow: 0 6px 24px rgba(22,163,74,0.55) !important;
+        }
+        </style>
+        <div class="start-scan-btn">
+        """, unsafe_allow_html=True)
         if st.button("🚀  Start Scanning", use_container_width=True, type="primary", key="start_file_batch"):
             st.session_state.file_batch_id = str(uuid.uuid4())
             st.session_state.file_items    = []
@@ -1044,6 +1084,7 @@ elif st.session_state.active_tab == "batch":
             # Auto-create first item group immediately
             st.session_state.file_group_id = create_file_group()
             st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # ── ACTIVE BATCH ──────────────────────────────────────────────
     else:
@@ -1374,7 +1415,7 @@ elif st.session_state.active_tab == "dashboard":
                     <div style='background:#1e2130; border:{border}; border-radius:12px; overflow:hidden; margin-bottom:2px;
                     {"border-left:" + border_l + ";" if border_l else ""}'>
                       <div style='position:relative; height:130px; background:#161925; overflow:hidden; cursor:pointer;'>
-                        {"<img src='" + t['url'] + "' style='width:100%;height:100%;object-fit:cover;display:block;'/>" if t['url'] else "<div style='width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:#cbd5e1;'>📷</div>"}
+                        {"<img src='" + photo_url(t['pid'], thumb=True) + "' style='width:100%;height:100%;object-fit:cover;display:block;'/>" if t['pid'] else "" if t['url'] else "<div style='width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:#cbd5e1;'>📷</div>"}
                         <div style='position:absolute;top:6px;right:6px;'>{status_badge}</div>
                       </div>
                       <div style='padding:8px 10px 4px;'>
