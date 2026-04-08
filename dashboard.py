@@ -123,14 +123,14 @@ st.set_page_config(
 st.markdown("""
 <style>
     #MainMenu, footer, header { visibility: hidden; }
-    .stApp { background-color: #f1f5f9; }
+    .stApp { background-color: #0f1117; }
     .block-container { padding: 0 !important; max-width: 100% !important; }
     hr { border-color: #e2e8f0 !important; margin: 0.75rem 0; }
 
     [data-testid="stTextInput"] input {
         background: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
-        color: #0f172a !important;
+        color: #e2e8f0 !important;
         border-radius: 6px !important;
         font-size: 0.82rem !important;
         padding: 4px 8px !important;
@@ -144,7 +144,7 @@ st.markdown("""
     [data-testid="stNumberInput"] input {
         background: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
-        color: #0f172a !important;
+        color: #e2e8f0 !important;
         border-radius: 6px !important;
         font-size: 0.82rem !important;
         height: 34px !important;
@@ -152,7 +152,7 @@ st.markdown("""
     [data-testid="stSelectbox"] > div > div {
         background: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
-        color: #0f172a !important;
+        color: #e2e8f0 !important;
         border-radius: 6px !important;
         font-size: 0.82rem !important;
         min-height: 34px !important;
@@ -179,7 +179,7 @@ st.markdown("""
     }
     [data-testid="stExpander"] {
         background: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
+        border: 1px solid #2d3348 !important;
         border-radius: 10px !important;
     }
     [data-testid="stAlert"] {
@@ -229,8 +229,8 @@ st.markdown("""
         font-weight: 600;
     }
     .batch-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
+        background: #1e2130;
+        border: 1px solid #2d3348;
         border-radius: 10px;
         padding: 0.65rem 0.9rem;
         margin-bottom: 0.4rem;
@@ -260,8 +260,8 @@ st.markdown("""
     }
     .page-content { padding: 0.85rem 1.5rem; max-width: 1400px; margin: 0 auto; }
     .mode-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
+        background: #1e2130;
+        border: 1px solid #2d3348;
         border-radius: 14px;
         padding: 1.5rem 1rem;
         text-align: center;
@@ -642,7 +642,7 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
 #  DATA FETCH
 # ------------------------------------------------------------------ #
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=120)
 def fetch_listings():
     result = (
         supabase.table("listings")
@@ -693,20 +693,20 @@ df_top = fetch_listings()
 
 # Logo bar
 st.markdown("""
-<div style='background:#ffffff; border-bottom:1px solid #e2e8f0; padding:0 1.5rem;
+<div style='background:#1e2130; border-bottom:1px solid #2d3348; padding:0 1.5rem;
 display:flex; align-items:center; justify-content:space-between; height:50px;
 box-shadow: 0 1px 4px rgba(0,0,0,0.06);'>
-    <div style='color:#0f172a; font-size:1rem; font-weight:700; letter-spacing:-0.02em;
+    <div style='color:#e2e8f0; font-size:1rem; font-weight:700; letter-spacing:-0.02em;
     display:flex; align-items:center; gap:8px;'>
         <div style='width:8px; height:8px; background:#2563eb; border-radius:50%;'></div>
         Lister AI
     </div>
-    <div style='color:#94a3b8; font-size:0.68rem; letter-spacing:0.08em; font-weight:500;'>EMPLOYEE DASHBOARD</div>
+    <div style='color:#64748b; font-size:0.68rem; letter-spacing:0.08em; font-weight:500;'>EMPLOYEE DASHBOARD</div>
 </div>
 """, unsafe_allow_html=True)
 
 # Color-coded nav toolbar — separated from page content
-st.markdown("<div style='background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:4px 8px;'>", unsafe_allow_html=True)
+st.markdown("<div style='background:#161925; border-bottom:1px solid #2d3348; padding:4px 8px;'>", unsafe_allow_html=True)
 t1, t2, t3, t4, t5, t6, t7 = st.columns([2, 1.5, 1.5, 1.5, 1.5, 1, 1.5])
 with t1:
     st.markdown("<div class='tab-dashboard'>", unsafe_allow_html=True)
@@ -813,8 +813,8 @@ if st.session_state.active_tab == "camera":
         st.markdown("""
         <div style='text-align:center; padding:2rem 0 1rem;'>
             <div style='font-size:2.5rem; margin-bottom:0.5rem;'>📸</div>
-            <div style='color:#111827; font-size:1.1rem; font-weight:600;'>Camera Scan</div>
-            <div style='color:#4a4a5a; font-size:0.82rem; margin-top:0.3rem;'>Take up to 10 photos per item</div>
+            <div style='color:#e2e8f0; font-size:1.1rem; font-weight:600;'>Camera Scan</div>
+            <div style='color:#64748b; font-size:0.82rem; margin-top:0.3rem;'>Take up to 10 photos per item</div>
         </div>""", unsafe_allow_html=True)
         st.markdown("<div class='field-label' style='text-align:center;'>Condition for this Batch</div>", unsafe_allow_html=True)
         ca, cb = st.columns(2)
@@ -844,11 +844,11 @@ if st.session_state.active_tab == "camera":
         total_cam = len(st.session_state.cam_items)
         cond_color = "#22c55e" if st.session_state.cam_condition=="new" else "#2196F3"
         st.markdown(f"""
-        <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid {cond_color};
+        <div style='background:#1e2130; border:1px solid #2d3348; border-left:4px solid {cond_color};
         border-radius:10px; padding:0.65rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
             <div>
-                <span style='color:#111827; font-size:0.9rem; font-weight:600;'>Camera Batch</span>
-                <span style='color:#4a4a5a; font-size:0.72rem; margin-left:10px;'>
+                <span style='color:#e2e8f0; font-size:0.9rem; font-weight:600;'>Camera Batch</span>
+                <span style='color:#64748b; font-size:0.72rem; margin-left:10px;'>
                     {total_cam} items · <span style='color:{cond_color};'>{st.session_state.cam_condition.title()}</span>
                 </span>
             </div>
@@ -861,8 +861,8 @@ if st.session_state.active_tab == "camera":
                     idx = total_cam - i
                     st.markdown(f"""<div class='batch-card processing'>
                         <div style='display:flex; justify-content:space-between; align-items:center;'>
-                            <div><span style='color:#0f172a; font-size:0.82rem; font-weight:500;'>Item {idx}</span>
-                            <span style='color:#4a4a5a; font-size:0.7rem; margin-left:8px;'>{item.get("photo_count",0)} photos · Qty {item.get("qty",1)}</span></div>
+                            <div><span style='color:#e2e8f0; font-size:0.82rem; font-weight:500;'>Item {idx}</span>
+                            <span style='color:#64748b; font-size:0.7rem; margin-left:8px;'>{item.get("photo_count",0)} photos · Qty {item.get("qty",1)}</span></div>
                             <span class='status-pill pill-processing'>Processing...</span>
                         </div></div>""", unsafe_allow_html=True)
                 st.divider()
@@ -886,9 +886,9 @@ if st.session_state.active_tab == "camera":
             photo_count = len(st.session_state.cam_photos)
             remaining = 10 - photo_count
             st.markdown(f"""
-            <div style='background:#eff6ff; border:1.5px solid #3b82f6; border-radius:12px;
+            <div style='background:#0d1b38; border:1.5px solid #3b82f6; border-radius:12px;
             padding:0.75rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
-                <span style='color:#111827; font-size:0.9rem; font-weight:600;'>Item {item_num}</span>
+                <span style='color:#e2e8f0; font-size:0.9rem; font-weight:600;'>Item {item_num}</span>
                 <span style='color:#60b4ff; font-size:0.82rem; font-weight:500;'>{photo_count}/10 photos</span>
             </div>""", unsafe_allow_html=True)
             if st.session_state.cam_photos:
@@ -896,7 +896,7 @@ if st.session_state.active_tab == "camera":
                 for col, pb in zip(tc, st.session_state.cam_photos):
                     with col: st.image(pb, use_container_width=True)
             if remaining > 0:
-                st.markdown(f"<div style='color:#4a4a5a; font-size:0.72rem; margin-bottom:4px;'>Photo {photo_count+1} of up to 10</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='color:#64748b; font-size:0.72rem; margin-bottom:4px;'>Photo {photo_count+1} of up to 10</div>", unsafe_allow_html=True)
                 cam_img = st.camera_input("Take photo", label_visibility="collapsed", key=f"cam_{st.session_state.cam_group_id}_{photo_count}")
                 if cam_img:
                     st.session_state.cam_photos.append(cam_img.read()); st.rerun()
@@ -998,7 +998,7 @@ elif st.session_state.active_tab == "batch":
         st.markdown("""
         <div style='text-align:center; padding:1.5rem 0 1rem;'>
             <div style='font-size:2.5rem; margin-bottom:0.4rem;'>📸</div>
-            <div style='color:#0f172a; font-size:1.1rem; font-weight:700;'>Batch Upload</div>
+            <div style='color:#e2e8f0; font-size:1.1rem; font-weight:700;'>Batch Upload</div>
             <div style='color:#64748b; font-size:0.82rem; margin-top:0.3rem;'>
                 Tap <b>Take Photo</b> or select from library. Repeat for each item.
             </div>
@@ -1042,9 +1042,9 @@ elif st.session_state.active_tab == "batch":
         col_status, col_end = st.columns([4, 1])
         with col_status:
             st.markdown(f"""
-            <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid {cond_clr};
+            <div style='background:#1e2130; border:1px solid #2d3348; border-left:4px solid {cond_clr};
             border-radius:8px; padding:0.5rem 0.85rem; margin-bottom:0.6rem;'>
-                <span style='color:#0f172a; font-size:0.85rem; font-weight:600;'>
+                <span style='color:#e2e8f0; font-size:0.85rem; font-weight:600;'>
                     {st.session_state.file_condition.title()} Batch
                 </span>
                 <span style='color:#64748b; font-size:0.75rem; margin-left:8px;'>
@@ -1071,9 +1071,9 @@ elif st.session_state.active_tab == "batch":
         if st.session_state.file_group_id:
             item_num = total_f + 1
             st.markdown(f"""
-            <div style='background:#eff6ff; border:1.5px solid #0891b2; border-radius:10px;
+            <div style='background:#0d1b38; border:1.5px solid #0891b2; border-radius:10px;
             padding:0.6rem 0.9rem; margin-bottom:0.5rem; display:flex; justify-content:space-between; align-items:center;'>
-                <span style='color:#0f172a; font-size:0.9rem; font-weight:700;'>Item {item_num}</span>
+                <span style='color:#e2e8f0; font-size:0.9rem; font-weight:700;'>Item {item_num}</span>
                 <span style='color:#0891b2; font-size:0.75rem; font-weight:500;'>Take or upload photos below</span>
             </div>""", unsafe_allow_html=True)
 
@@ -1107,7 +1107,7 @@ elif st.session_state.active_tab == "batch":
                     if st.session_state.file_qty > 1: st.session_state.file_qty -= 1; st.rerun()
             with q2:
                 st.markdown(
-                    f"<div style='text-align:center; font-size:1.5rem; font-weight:700; color:#0f172a; padding-top:2px;'>"
+                    f"<div style='text-align:center; font-size:1.5rem; font-weight:700; color:#e2e8f0; padding-top:2px;'>"
                     f"{st.session_state.file_qty}</div>", unsafe_allow_html=True)
             with q3:
                 if st.button("+", key="fq_plus", use_container_width=True):
@@ -1153,11 +1153,27 @@ elif st.session_state.active_tab == "batch":
 
 elif st.session_state.active_tab == "dashboard":
 
+    # One-time JS to color all +/- buttons on this tab
+    st.markdown("""
+    <style>
+    button[data-testid="baseButton-secondary"] p { font-weight: 900 !important; }
+    </style>
+    <script>
+    setTimeout(function() {
+        document.querySelectorAll('[data-testid="stButton"] button').forEach(function(btn) {
+            var txt = btn.innerText.trim();
+            if (txt === '−') btn.style.color = '#dc2626';
+            if (txt === '+') btn.style.color = '#16a34a';
+        });
+    }, 400);
+    </script>
+    """, unsafe_allow_html=True)
+
     df = fetch_listings()
 
     if df.empty:
         st.markdown("""
-        <div style="text-align:center; padding:3rem 0; color:#4a4a5a;">
+        <div style="text-align:center; padding:3rem 0; color:#64748b;">
             <div style="font-size:2rem; margin-bottom:0.75rem;">📭</div>
             <div style="font-size:1rem; font-weight:500; color:#aaaacc;">No items in current batch</div>
             <div style="font-size:0.8rem; margin-top:0.4rem;">Use Batch Upload to scan products</div>
@@ -1205,9 +1221,9 @@ elif st.session_state.active_tab == "dashboard":
             with col:
                 sub_html = f"<div style='color:#6b6b7b; font-size:0.68rem; margin-top:2px;'>{sub}</div>" if sub else ""
                 st.markdown(f"""
-                <div style='background:#ffffff; border:1px solid #e2e8f0; border-top:3px solid {color};
+                <div style='background:#1e2130; border:1px solid #2d3348; border-top:3px solid {color};
                 border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:0.75rem;'>
-                    <div style='color:#0f172a; font-size:1.8rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{val}</div>
+                    <div style='color:#e2e8f0; font-size:1.8rem; font-weight:700; letter-spacing:-0.03em; line-height:1;'>{val}</div>
                     <div style='color:#64748b; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:5px;'>{label}</div>
                     {sub_html}
                 </div>""", unsafe_allow_html=True)
@@ -1337,26 +1353,26 @@ elif st.session_state.active_tab == "dashboard":
 
                     status_badge = ""
                     if t["ebay_status"] == "draft" and t["ebay_item_id"]:
-                        status_badge = f"<a href='https://www.ebay.com/itm/{t['ebay_item_id']}' target='_blank' style='background:#eff6ff;color:#2563eb;border:0.5px solid #bfdbfe;border-radius:10px;font-size:9px;font-weight:700;padding:2px 7px;text-decoration:none;'>eBay Draft</a>"
+                        status_badge = f"<a href='https://www.ebay.com/itm/{t['ebay_item_id']}' target='_blank' style='background:#0d1b38;color:#2563eb;border:0.5px solid #bfdbfe;border-radius:10px;font-size:9px;font-weight:700;padding:2px 7px;text-decoration:none;'>eBay Draft</a>"
                     elif t["price_note"] in ("new","used"):
-                        status_badge = f"<span style='background:#fffbeb;color:#d97706;border-radius:10px;font-size:9px;font-weight:700;padding:2px 7px;'>⚠ fallback</span>"
+                        status_badge = f"<span style='background:#2a1f00;color:#d97706;border-radius:10px;font-size:9px;font-weight:700;padding:2px 7px;'>⚠ fallback</span>"
 
                     # Card wrapper
                     st.markdown(f"""
-                    <div style='background:#fff; border:{border}; border-radius:12px; overflow:hidden; margin-bottom:2px;
+                    <div style='background:#1e2130; border:{border}; border-radius:12px; overflow:hidden; margin-bottom:2px;
                     {"border-left:" + border_l + ";" if border_l else ""}'>
-                      <div style='position:relative; height:130px; background:#f8fafc; overflow:hidden; cursor:pointer;'>
+                      <div style='position:relative; height:130px; background:#161925; overflow:hidden; cursor:pointer;'>
                         {"<img src='" + t['url'] + "' style='width:100%;height:100%;object-fit:cover;display:block;'/>" if t['url'] else "<div style='width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:#cbd5e1;'>📷</div>"}
                         <div style='position:absolute;top:6px;right:6px;'>{status_badge}</div>
                       </div>
                       <div style='padding:8px 10px 4px;'>
-                        <div style='font-size:12px;font-weight:600;color:#0f172a;line-height:1.3;min-height:32px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>{t['title']}</div>
-                        <div style='font-size:10px;color:#94a3b8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{t['category']}</div>
+                        <div style='font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.3;min-height:32px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>{t['title']}</div>
+                        <div style='font-size:10px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{t['category']}</div>
                         <div style='display:flex;align-items:baseline;justify-content:space-between;margin-top:6px;'>
-                          <div style='font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-0.3px;'>${t['price']:.2f}</div>
+                          <div style='font-size:18px;font-weight:800;color:#e2e8f0;letter-spacing:-0.3px;'>${t['price']:.2f}</div>
                           <div style='font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:{"#f0fdf4" if t["condition"]=="new" else "#eff6ff"};color:{cond_col};'>{cond_lbl}</div>
                         </div>
-                        {"<div style='font-size:10px;color:#94a3b8;margin-top:2px;'>" + ref_str + "</div>" if ref_str else ""}
+                        {"<div style='font-size:10px;color:#64748b;margin-top:2px;'>" + ref_str + "</div>" if ref_str else ""}
                       </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -1379,7 +1395,7 @@ elif st.session_state.active_tab == "dashboard":
                             st.rerun()
                     with q2:
                         st.markdown(
-                            f"<div style='text-align:center;font-size:14px;font-weight:700;color:#0f172a;padding-top:6px;'>{t['qty']}</div>",
+                            f"<div style='text-align:center;font-size:14px;font-weight:700;color:#e2e8f0;padding-top:6px;'>{t['qty']}</div>",
                             unsafe_allow_html=True)
                     with q3:
                         if st.button("+", key=f"plus_{item_id}", use_container_width=True,
@@ -1389,18 +1405,26 @@ elif st.session_state.active_tab == "dashboard":
                             update_field(item_id, "quantity", new_qty)
                             st.rerun()
 
-                    # Style the +/- buttons with JS
-                    st.markdown(f"""
-                    <script>
-                    (function() {{
-                        var btns = document.querySelectorAll('[data-testid="stButton"] button');
-                        btns.forEach(function(btn) {{
-                            if (btn.innerText === '−') btn.style.color = '#dc2626';
-                            if (btn.innerText === '+') btn.style.color = '#16a34a';
-                        }});
-                    }})();
-                    </script>
-                    """, unsafe_allow_html=True)
+
+
+                    # Re-scan button
+                    if st.button("🔄 Re-scan", key=f"rescan_{item_id}",
+                                 use_container_width=True, type="secondary",
+                                 help="Re-submit this item to the scanner"):
+                        try:
+                            # Reset the listing group to pending so scanner picks it up
+                            grp = supabase.table("group_photos")                                .select("group_id")                                .eq("photo_id", t["pid"])                                .limit(1).execute()
+                            if grp.data:
+                                gid = grp.data[0]["group_id"]
+                                supabase.table("listing_groups")                                    .update({"status": "pending"})                                    .eq("id", gid).execute()
+                                supabase.table("listings")                                    .update({"status": "pending", "title": "Scanning..."})                                    .eq("id", item_id).execute()
+                                st.cache_data.clear()
+                                st.success(f"Resubmitted — scanner will process shortly")
+                                st.rerun()
+                            else:
+                                st.warning("Could not find original photos for this item")
+                        except Exception as e:
+                            st.error(f"Re-scan failed: {e}")
 
                     # Expandable detail
                     with st.expander("Edit details", expanded=False):
@@ -1456,7 +1480,7 @@ elif st.session_state.active_tab == "dashboard":
         issues_df = fetch_issues()
 
         if issues_df.empty:
-            st.markdown("<p style='color:#4a4a5a; font-size:0.8rem;'>No issues submitted yet.</p>", unsafe_allow_html=True)
+            st.markdown("<p style='color:#64748b; font-size:0.8rem;'>No issues submitted yet.</p>", unsafe_allow_html=True)
         else:
             for _, issue in issues_df.iterrows():
                 issue_id  = str(issue.get("id", ""))
@@ -1465,10 +1489,10 @@ elif st.session_state.active_tab == "dashboard":
                 if hasattr(submitted, "strftime"):
                     submitted = submitted.strftime("%b %d %I:%M %p")
                 st.markdown(f"""
-                <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+                <div style='background:#161925; border:1px solid #2d3348; border-radius:8px;
                 padding:0.6rem 0.9rem; margin-bottom:0.4rem;'>
-                    <div style='color:#4a4a5a; font-size:0.65rem; margin-bottom:3px;'>{submitted}</div>
-                    <div style='color:#111827; font-size:0.82rem;'>{desc}</div>
+                    <div style='color:#64748b; font-size:0.65rem; margin-bottom:3px;'>{submitted}</div>
+                    <div style='color:#e2e8f0; font-size:0.82rem;'>{desc}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 if st.button("✓ Resolved", key=f"resolve_{issue_id}"):
@@ -1522,7 +1546,7 @@ elif st.session_state.active_tab == "research":
 
     if research_df.empty:
         st.markdown("""
-        <div style="text-align:center; padding:3rem 0; color:#4a4a5a;">
+        <div style="text-align:center; padding:3rem 0; color:#64748b;">
             <div style="font-size:2rem; margin-bottom:0.75rem;">🔍</div>
             <div style="font-size:1rem; font-weight:500; color:#aaaacc;">No research results yet</div>
             <div style="font-size:0.8rem; margin-top:0.4rem;">
@@ -1548,10 +1572,10 @@ elif st.session_state.active_tab == "research":
         ]:
             with col:
                 st.markdown(f"""
-                <div style='background:#ffffff; border:1px solid #e2e8f0; border-top:3px solid {color};
+                <div style='background:#1e2130; border:1px solid #2d3348; border-top:3px solid {color};
                 border-radius:10px; padding:0.85rem 1.1rem; margin-bottom:0.75rem;'>
-                    <div style='color:#111827; font-size:1.2rem; font-weight:700; line-height:1;'>{val}</div>
-                    <div style='color:#4a4a5a; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:5px;'>{label}</div>
+                    <div style='color:#e2e8f0; font-size:1.2rem; font-weight:700; line-height:1;'>{val}</div>
+                    <div style='color:#64748b; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:5px;'>{label}</div>
                 </div>""", unsafe_allow_html=True)
 
         st.divider()
@@ -1572,7 +1596,7 @@ elif st.session_state.active_tab == "research":
             filtered_df = filtered_df[filtered_df["ebay_price"] < filtered_df["source_price"]]
 
         st.markdown(
-            f"<p style='color:#4a4a5a; font-size:0.75rem; margin-bottom:1rem;'>Showing {len(filtered_df)} listings</p>",
+            f"<p style='color:#64748b; font-size:0.75rem; margin-bottom:1rem;'>Showing {len(filtered_df)} listings</p>",
             unsafe_allow_html=True
         )
 
@@ -1611,19 +1635,19 @@ elif st.session_state.active_tab == "research":
                                 try:
                                     st.image(ebay_image, use_container_width=True)
                                 except Exception:
-                                    st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:8px; height:120px; display:flex; align-items:center; justify-content:center; color:#4a4a5a;'>📷</div>", unsafe_allow_html=True)
+                                    st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:8px; height:120px; display:flex; align-items:center; justify-content:center; color:#64748b;'>📷</div>", unsafe_allow_html=True)
                             else:
-                                st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:8px; height:120px; display:flex; align-items:center; justify-content:center; color:#4a4a5a;'>📷</div>", unsafe_allow_html=True)
+                                st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:8px; height:120px; display:flex; align-items:center; justify-content:center; color:#64748b;'>📷</div>", unsafe_allow_html=True)
 
                             st.markdown(f"""
-                            <div style='background:#ffffff; border:1px solid {border_color};
+                            <div style='background:#1e2130; border:1px solid {border_color};
                             border-radius:8px; padding:0.6rem 0.75rem; margin-top:6px; margin-bottom:4px;'>
-                                <div style='color:#111827; font-size:0.75rem; font-weight:500;
+                                <div style='color:#e2e8f0; font-size:0.75rem; font-weight:500;
                                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
                                 margin-bottom:6px;' title='{ebay_title}'>{ebay_title[:50]}</div>
                                 <div style='color:{price_color}; font-size:1.1rem; font-weight:700;'>${ebay_price:.2f}</div>
                                 <div style='color:{profit_color}; font-size:0.65rem; margin-top:2px;'>{profit_str}</div>
-                                <div style='color:#4a4a5a; font-size:0.65rem; margin-top:2px;'>{ebay_cond}</div>
+                                <div style='color:#64748b; font-size:0.65rem; margin-top:2px;'>{ebay_cond}</div>
                             </div>
                             """, unsafe_allow_html=True)
 
@@ -1689,7 +1713,7 @@ elif st.session_state.active_tab == "auction":
     # ---- Header -------------------------------------------------- #
     st.markdown("""
     <div style='margin-bottom:0.75rem;'>
-        <div style='color:#0f172a; font-size:1.1rem; font-weight:700; margin-bottom:2px;'>🔨 Auction Scanner</div>
+        <div style='color:#e2e8f0; font-size:1.1rem; font-weight:700; margin-bottom:2px;'>🔨 Auction Scanner</div>
         <div style='color:#64748b; font-size:0.8rem;'>Paste any auction URL — scrapes listings and looks up market values automatically. Scans are saved and can be revisited anytime.</div>
     </div>
     """, unsafe_allow_html=True)
@@ -1835,11 +1859,11 @@ elif st.session_state.active_tab == "auction":
         favorited_cnt = sum(1 for i in items if i.get("favorited"))
 
         st.markdown(f"""
-        <div style='background:#ffffff; border:1px solid #e2e8f0; border-radius:10px;
+        <div style='background:#1e2130; border:1px solid #2d3348; border-radius:10px;
         padding:0.65rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
             <div>
-                <div style='color:#0f172a; font-size:0.82rem; font-weight:600; margin-bottom:2px;'>{source_url[:60]}</div>
-                <div style='color:#94a3b8; font-size:0.7rem;'>
+                <div style='color:#e2e8f0; font-size:0.82rem; font-weight:600; margin-bottom:2px;'>{source_url[:60]}</div>
+                <div style='color:#64748b; font-size:0.7rem;'>
                     {total_items} listings · {valued_items} valued · {favorited_cnt} favorited · last refreshed {last_ref}
                 </div>
             </div>
@@ -1931,9 +1955,9 @@ elif st.session_state.active_tab == "auction":
             ]:
                 with col:
                     st.markdown(f"""
-                    <div style='background:#ffffff; border:1px solid #e2e8f0; border-top:3px solid {color};
+                    <div style='background:#1e2130; border:1px solid #2d3348; border-top:3px solid {color};
                     border-radius:10px; padding:0.65rem 1rem; margin-bottom:0.75rem;'>
-                        <div style='color:#0f172a; font-size:1.5rem; font-weight:700; line-height:1;'>{val}</div>
+                        <div style='color:#e2e8f0; font-size:1.5rem; font-weight:700; line-height:1;'>{val}</div>
                         <div style='color:#64748b; font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; margin-top:4px;'>{label}</div>
                     </div>""", unsafe_allow_html=True)
 
@@ -1960,7 +1984,7 @@ elif st.session_state.active_tab == "auction":
             elif sort_by == "Value ↑":
                 filtered.sort(key=lambda x: x.get("value_used_high",0))
 
-            st.markdown(f"<p style='color:#94a3b8; font-size:0.75rem; margin-bottom:0.5rem;'>Showing {len(filtered)} of {total_items} listings</p>",
+            st.markdown(f"<p style='color:#64748b; font-size:0.75rem; margin-bottom:0.5rem;'>Showing {len(filtered)} of {total_items} listings</p>",
                         unsafe_allow_html=True)
 
             # Item cards
@@ -1993,7 +2017,7 @@ elif st.session_state.active_tab == "auction":
                     margin_color = "#94a3b8"
 
                 st.markdown(
-                    f"<div style='background:#ffffff; border:1px solid {border_color}; "
+                    f"<div style='background:#1e2130; border:1px solid {border_color}; "
                     f"border-radius:12px; padding:0.75rem; margin-bottom:0.5rem; "
                     f"box-shadow:0 1px 3px rgba(0,0,0,0.05);'>",
                     unsafe_allow_html=True
@@ -2008,18 +2032,18 @@ elif st.session_state.active_tab == "auction":
                             f"object-fit:cover; max-height:90px; cursor:pointer;'/></a>",
                             unsafe_allow_html=True)
                     else:
-                        st.markdown("<div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; height:80px; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:1.2rem;'>🔨</div>", unsafe_allow_html=True)
+                        st.markdown("<div style='background:#161925; border:1px solid #2d3348; border-radius:8px; height:80px; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:1.2rem;'>🔨</div>", unsafe_allow_html=True)
 
                 with info_col:
                     ai_badge = ""
                     if is_gemini and val_status == "done":
                         conf_color = {"high":"#16a34a","medium":"#d97706","low":"#dc2626"}.get(ai_conf,"#64748b")
-                        ai_badge = f"<span style=\'background:#f0fdf4; color:{conf_color}; border:1px solid #bbf7d0; border-radius:4px; font-size:0.6rem; font-weight:600; padding:1px 6px; margin-left:6px;\'>🤖 AI Vision</span>"
+                        ai_badge = f"<span style=\'background:#0d2818; color:{conf_color}; border:1px solid #bbf7d0; border-radius:4px; font-size:0.6rem; font-weight:600; padding:1px 6px; margin-left:6px;\'>🤖 AI Vision</span>"
 
-                    st.markdown(f"<div style=\'color:#0f172a; font-size:0.85rem; font-weight:600; margin-bottom:4px; line-height:1.3;\'>{title[:120]}{ai_badge}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style=\'color:#e2e8f0; font-size:0.85rem; font-weight:600; margin-bottom:4px; line-height:1.3;\'>{title[:120]}{ai_badge}</div>", unsafe_allow_html=True)
 
                     if ai_desc and ai_desc.lower()[:30] != title.lower()[:30]:
-                        st.markdown(f"<div style=\'color:#475569; font-size:0.76rem; margin-bottom:5px; background:#f8fafc; border-left:3px solid #cbd5e1; padding:4px 8px; border-radius:0 6px 6px 0;\'>📝 {ai_desc}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style=\'color:#64748b; font-size:0.76rem; margin-bottom:5px; background:#161925; border-left:3px solid #cbd5e1; padding:4px 8px; border-radius:0 6px 6px 0;\'>📝 {ai_desc}</div>", unsafe_allow_html=True)
 
                     price_str = f"${cur_price:.2f}" if cur_price > 0 else "No bids"
                     time_str  = f"⏱ {time_left}" if time_left else ""
@@ -2030,8 +2054,8 @@ elif st.session_state.active_tab == "auction":
                         <div style='display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-top:6px;'>
                             <div>
                                 <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>Current Bid</div>
-                                <div style='color:#0f172a; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
-                                {f"<div style='color:#94a3b8; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
+                                <div style='color:#e2e8f0; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
+                                {f"<div style='color:#64748b; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
                             </div>
                             <div style='width:1px; background:#e2e8f0; align-self:stretch; margin:0 4px;'></div>
                             <div>
@@ -2046,22 +2070,22 @@ elif st.session_state.active_tab == "auction":
                         <div style='display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; margin-top:6px;'>
                             <div>
                                 <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>Current Bid</div>
-                                <div style='color:#0f172a; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
-                                {f"<div style='color:#94a3b8; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
+                                <div style='color:#e2e8f0; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
+                                {f"<div style='color:#64748b; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
                             </div>
                             <div style='width:1px; background:#e2e8f0; align-self:stretch; margin:0 4px;'></div>
                             <div>
                                 <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>Est. Value</div>
-                                <div style='color:#94a3b8; font-size:1rem; font-weight:600;'>⏳ Researching...</div>
+                                <div style='color:#64748b; font-size:1rem; font-weight:600;'>⏳ Researching...</div>
                             </div>
                         </div>"""
                     else:
                         val_html = f"""
                         <div style='margin-top:6px;'>
                             <div style='color:#64748b; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-bottom:2px;'>Current Bid</div>
-                            <div style='color:#0f172a; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
-                            {f"<div style='color:#94a3b8; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
-                            <div style='color:#94a3b8; font-size:0.75rem; margin-top:6px;'>Value unavailable</div>
+                            <div style='color:#e2e8f0; font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1;'>{price_str}</div>
+                            {f"<div style='color:#64748b; font-size:0.7rem; margin-top:2px;'>{time_str}</div>" if time_str else ""}
+                            <div style='color:#64748b; font-size:0.75rem; margin-top:6px;'>Value unavailable</div>
                         </div>"""
 
                     st.markdown(val_html, unsafe_allow_html=True)
@@ -2077,7 +2101,7 @@ elif st.session_state.active_tab == "auction":
                     if listing_url:
                         st.markdown(
                             f"<a href='{listing_url}' target='_blank' style='display:block; text-align:center; "
-                            f"background:#eff6ff; border:1px solid #93c5fd; border-radius:6px; padding:5px 8px; "
+                            f"background:#0d1b38; border:1px solid #93c5fd; border-radius:6px; padding:5px 8px; "
                             f"color:#1d4ed8; font-size:0.7rem; font-weight:600; text-decoration:none; margin-top:4px;'>View ↗</a>",
                             unsafe_allow_html=True)
 
@@ -2085,9 +2109,9 @@ elif st.session_state.active_tab == "auction":
 
     if not sessions and st.session_state.auction_active_session is None:
         st.markdown("""
-        <div style='text-align:center; padding:3rem 0; color:#94a3b8;'>
+        <div style='text-align:center; padding:3rem 0; color:#64748b;'>
             <div style='font-size:3rem; margin-bottom:0.75rem;'>🔨</div>
-            <div style='color:#475569; font-size:1rem; font-weight:500; margin-bottom:0.4rem;'>No auction scanned yet</div>
+            <div style='color:#64748b; font-size:1rem; font-weight:500; margin-bottom:0.4rem;'>No auction scanned yet</div>
             <div style='font-size:0.82rem;'>Paste an auction URL above and click Scan.<br>Works with BidSpotter, Purple Wave, IronPlanet, GovPlanet, and more.</div>
         </div>
         """, unsafe_allow_html=True)
@@ -2104,7 +2128,7 @@ if st.session_state.active_tab == "settings":
 
     st.markdown("""
     <div style='margin-bottom:1rem;'>
-        <div style='color:#0f172a; font-size:1.1rem; font-weight:700; margin-bottom:2px;'>⚙️ Settings</div>
+        <div style='color:#e2e8f0; font-size:1.1rem; font-weight:700; margin-bottom:2px;'>⚙️ Settings</div>
         <div style='color:#64748b; font-size:0.8rem;'>Configure API keys and credentials. Changes are saved to Supabase and take effect immediately.</div>
     </div>
     """, unsafe_allow_html=True)
@@ -2131,9 +2155,9 @@ if st.session_state.active_tab == "settings":
 
     # ---- Gemini API -------------------------------------------- #
     st.markdown("""
-    <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid #2563eb;
+    <div style='background:#1e2130; border:1px solid #2d3348; border-left:4px solid #2563eb;
     border-radius:10px; padding:1rem 1.25rem; margin-bottom:1rem;'>
-        <div style='color:#0f172a; font-size:0.9rem; font-weight:600; margin-bottom:4px;'>🤖 Google Gemini API</div>
+        <div style='color:#e2e8f0; font-size:0.9rem; font-weight:600; margin-bottom:4px;'>🤖 Google Gemini API</div>
         <div style='color:#64748b; font-size:0.75rem;'>Used for AI scanning, image analysis, and auction value research.</div>
     </div>
     """, unsafe_allow_html=True)
@@ -2142,7 +2166,7 @@ if st.session_state.active_tab == "settings":
     masked_gemini  = f"{current_gemini[:8]}...{current_gemini[-4:]}" if len(current_gemini) > 12 else ("Set" if current_gemini else "Not set")
 
     st.markdown(f"<div class='field-label'>Current Key</div>", unsafe_allow_html=True)
-    st.markdown(f"<div style='color:#475569; font-size:0.8rem; margin-bottom:8px; font-family:monospace;'>{masked_gemini}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color:#64748b; font-size:0.8rem; margin-bottom:8px; font-family:monospace;'>{masked_gemini}</div>", unsafe_allow_html=True)
 
     g1, g2 = st.columns([4, 1])
     with g1:
@@ -2156,13 +2180,13 @@ if st.session_state.active_tab == "settings":
             else:
                 st.warning("Enter a key first")
 
-    st.markdown("<div style='color:#94a3b8; font-size:0.72rem; margin-bottom:1.5rem;'>Get your key at console.cloud.google.com → APIs & Services → Credentials</div>", unsafe_allow_html=True)
+    st.markdown("<div style='color:#64748b; font-size:0.72rem; margin-bottom:1.5rem;'>Get your key at console.cloud.google.com → APIs & Services → Credentials</div>", unsafe_allow_html=True)
 
     # ---- eBay API ---------------------------------------------- #
     st.markdown("""
-    <div style='background:#ffffff; border:1px solid #e2e8f0; border-left:4px solid #ea580c;
+    <div style='background:#1e2130; border:1px solid #2d3348; border-left:4px solid #ea580c;
     border-radius:10px; padding:1rem 1.25rem; margin-bottom:1rem;'>
-        <div style='color:#0f172a; font-size:0.9rem; font-weight:600; margin-bottom:4px;'>🏷️ eBay API Credentials</div>
+        <div style='color:#e2e8f0; font-size:0.9rem; font-weight:600; margin-bottom:4px;'>🏷️ eBay API Credentials</div>
         <div style='color:#64748b; font-size:0.75rem;'>Used for direct listing submission. Find these at developer.ebay.com → Application Keys → Production.</div>
     </div>
     """, unsafe_allow_html=True)
@@ -2177,7 +2201,7 @@ if st.session_state.active_tab == "settings":
     for key, label, placeholder in ebay_fields:
         current_val = settings.get(key, os.getenv(key, ""))
         masked = f"{current_val[:6]}...{current_val[-4:]}" if len(current_val) > 10 else ("Set" if current_val else "Not set")
-        st.markdown(f"<div class='field-label'>{label} <span style='color:#94a3b8;'>({masked})</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='field-label'>{label} <span style='color:#64748b;'>({masked})</span></div>", unsafe_allow_html=True)
         ef1, ef2 = st.columns([4, 1])
         with ef1:
             new_val = st.text_input(label, placeholder=placeholder, type="password",
@@ -2194,11 +2218,11 @@ if st.session_state.active_tab == "settings":
 
     # ---- Supabase info (read only) ----------------------------- #
     st.markdown("""
-    <div style='background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1rem 1.25rem; margin-top:1rem;'>
-        <div style='color:#0f172a; font-size:0.9rem; font-weight:600; margin-bottom:8px;'>🗄️ Supabase</div>
+    <div style='background:#161925; border:1px solid #2d3348; border-radius:10px; padding:1rem 1.25rem; margin-top:1rem;'>
+        <div style='color:#e2e8f0; font-size:0.9rem; font-weight:600; margin-bottom:8px;'>🗄️ Supabase</div>
         <div style='color:#64748b; font-size:0.75rem; margin-bottom:4px;'>Project ID: fmrecxmhvodmkuimvjhi</div>
         <div style='color:#64748b; font-size:0.75rem; margin-bottom:4px;'>URL: https://fmrecxmhvodmkuimvjhi.supabase.co</div>
-        <div style='color:#94a3b8; font-size:0.72rem;'>Supabase credentials are managed via Railway environment variables.</div>
+        <div style='color:#64748b; font-size:0.72rem;'>Supabase credentials are managed via Railway environment variables.</div>
     </div>
     """, unsafe_allow_html=True)
 
