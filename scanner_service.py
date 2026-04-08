@@ -320,8 +320,10 @@ Return ONLY a raw JSON object, no markdown, no backticks:
   "price_new": recommended listing price for NEW condition as number only — 0 if none
 }}
 
-If you cannot identify the item use "Unknown Item" for title and 0 for all numeric fields.
-Never return placeholder text. Be specific with the title — include brand, model, size, specs."""
+Be as specific as possible with the title — include brand, model number, part number, size, and specs.
+Look carefully at ALL visible text, labels, and markings in the photos.
+Only use "Unknown Item" if the image is completely unidentifiable (blank, black, or corrupted).
+Even a partial identification is better than "Unknown Item" — describe what you can see."""
 
 # ------------------------------------------------------------------ #
 #  PROCESS A GROUP
@@ -402,13 +404,32 @@ def process_group(group: dict):
     print(f"   🔍 Step 1: Identifying item from photos...")
     title_for_ebay = "Unknown Item"
     try:
-        id_prompt = """Look at this item and return ONLY a JSON object:
-{"title": "brand model number specs as a concise eBay search query under 60 chars"}
-No markdown, no backticks, just JSON."""
-        id_resp = client.models.generate_content(model=model, contents=[*image_parts, id_prompt])
-        id_raw  = re.sub(r"^```[a-z]*\n?", "", id_resp.text.strip(), flags=re.IGNORECASE)
+        id_prompt = """Examine every visible detail in this photo carefully.
+Read ALL text, labels, brand names, model numbers, part numbers, serial numbers, and specifications.
+Look at shape, size, color, connectors, markings — everything.
+
+Return ONLY a raw JSON object, no markdown, no backticks:
+{"title": "Brand Model PartNumber Specs — concise eBay-style title under 60 chars"}
+
+Be as specific as possible. If you see a brand name, include it.
+If you see a model number, include it.
+If you see a part number, include it.
+Even if the item is partially visible, describe what you can see.
+Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, black, corrupted)."""
+
+        id_resp = client.models.generate_content(
+            model=model,
+            contents=[*image_parts, id_prompt],
+            config=types.GenerateContentConfig(max_output_tokens=200)
+        )
+        id_raw  = re.sub(r"^```[a-z]*\n?", "", (id_resp.text or "").strip(), flags=re.IGNORECASE)
         id_raw  = re.sub(r"\n?```$", "", id_raw).strip()
-        title_for_ebay = str(json.loads(id_raw).get("title", "Unknown Item")).strip()
+        json_match = re.search(r'\{[^{}]+\}', id_raw, re.DOTALL)
+        if json_match:
+            id_raw = json_match.group()
+        parsed_title = str(json.loads(id_raw).get("title", "")).strip()
+        if parsed_title and parsed_title.lower() not in ("unknown item", "unknown", ""):
+            title_for_ebay = parsed_title
         print(f"   🏷️  Identified: {title_for_ebay}")
     except Exception as e:
         print(f"   ⚠️  ID pass failed: {e}")
