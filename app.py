@@ -243,6 +243,43 @@ st.markdown("""
         background: #1e2130 !important;
         padding: 8px 4px !important;
     }
+    /* Force black text inside all input fields (white bg) */
+    [data-testid="stTextInput"] input {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #cbd5e1 !important;
+    }
+    [data-testid="stSelectbox"] > div > div {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #cbd5e1 !important;
+    }
+    [data-testid="stSelectbox"] option {
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+    [data-testid="stNumberInput"] input {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #cbd5e1 !important;
+    }
+    [data-testid="stTextArea"] textarea {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: #cbd5e1 !important;
+    }
+    [data-baseweb="select"] div {
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+    [data-baseweb="popover"] li {
+        color: #0f172a !important;
+        background: #ffffff !important;
+    }
+    [data-testid="stWidgetLabel"] p {
+        color: #94a3b8 !important;
+        font-size: 11px !important;
+    }
     /* Tile grid quantity buttons */
     [data-testid="stButton"] button[kind="secondary"]:has(> div > p:only-child) {
         font-size: 16px !important;
@@ -430,11 +467,10 @@ def append_to_archive(df: pd.DataFrame):
 def photo_url(photo_id: str, thumb: bool = False) -> str:
     if not photo_id or str(photo_id) in ("0", "", "nan"):
         return ""
-    base = f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
     if thumb:
-        # Supabase image transform — 300px wide thumbnail, much faster to load
-        return f"{SUPABASE_URL}/storage/v1/render/image/public/part-photos/{photo_id}?width=300&quality=70"
-    return base
+        # 500px square thumbnail — readable but fast
+        return f"{SUPABASE_URL}/storage/v1/render/image/public/part-photos/{photo_id}?width=500&height=500&resize=cover&quality=80"
+    return f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
 
 # ------------------------------------------------------------------ #
 #  eBay TRADING API — SUBMIT LISTING AS DRAFT (SCHEDULED)
