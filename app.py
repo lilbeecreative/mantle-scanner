@@ -213,6 +213,13 @@ st.markdown("""
     .tab-auction   [data-testid="baseButton-primary"] { background: #b45309 !important; }
     .tab-settings  [data-testid="baseButton-primary"] { background: #475569 !important; }
 
+    /* Tile grid quantity buttons */
+    [data-testid="stButton"] button[kind="secondary"]:has(> div > p:only-child) {
+        font-size: 16px !important;
+        font-weight: 900 !important;
+        padding: 4px !important;
+    }
+
     .field-label {
         color: #64748b;
         font-size: 0.65rem;
@@ -1282,181 +1289,167 @@ elif st.session_state.active_tab == "dashboard":
         if "quantities" not in st.session_state:
             st.session_state.quantities = {}
 
+        # Build tile data
+        tiles_data = []
         for _, item in df.iterrows():
-            item_id      = str(item.get("id", ""))
-            pid          = str(item.get("photo_id", ""))
-            title        = str(item.get("title", "Unknown"))
-            price        = float(item.get("price", 0.0))
-            price_note   = str(item.get("price_note", "")).strip().lower()
-            condition    = str(item.get("condition", "used")).strip().lower()
-            category     = str(item.get("ebay_category", ""))
-            cat_id       = str(item.get("ebay_category_id", "")).strip().replace(".0", "")
-            weight_oz    = float(item.get("weight_oz", 0.0) or 0.0)
-            price_used   = float(item.get("price_used", 0.0) or 0.0)
-            price_new    = float(item.get("price_new",  0.0) or 0.0)
-            url          = photo_url(pid)
-            has_dual     = price_used > 0 or price_new > 0
+            item_id    = str(item.get("id", ""))
+            pid        = str(item.get("photo_id", ""))
+            title      = str(item.get("title", "Unknown"))
+            price      = float(item.get("price", 0.0))
+            price_note = str(item.get("price_note", "")).strip().lower()
+            condition  = str(item.get("condition", "used")).strip().lower()
+            category   = str(item.get("ebay_category", ""))
+            cat_id     = str(item.get("ebay_category_id", "")).strip().replace(".0", "")
+            price_used = float(item.get("price_used", 0.0) or 0.0)
+            price_new  = float(item.get("price_new",  0.0) or 0.0)
+            url        = photo_url(pid)
             ebay_item_id = str(item.get("ebay_item_id","") or "")
             ebay_status  = str(item.get("ebay_status","") or "")
-
             if item_id and item_id not in st.session_state.quantities:
-                st.session_state.quantities[item_id] = int(item.get("quantity", 0))
+                st.session_state.quantities[item_id] = int(item.get("quantity", 1))
+            current_qty = st.session_state.quantities.get(item_id, 1)
+            tiles_data.append({
+                "id": item_id, "pid": pid, "title": title, "price": price,
+                "price_note": price_note, "condition": condition, "category": category,
+                "cat_id": cat_id, "price_used": price_used, "price_new": price_new,
+                "url": url, "ebay_item_id": ebay_item_id, "ebay_status": ebay_status,
+                "qty": current_qty, "item": item,
+            })
 
-            current_qty = st.session_state.quantities.get(item_id, 0)
-            flag_color  = "#f59e0b22" if price_note in ("new", "used") else "#1e1e28"
+        # Render tile grid — 3 columns on desktop
+        cols_per_row = 3
+        rows = [tiles_data[i:i+cols_per_row] for i in range(0, len(tiles_data), cols_per_row)]
 
-            is_selected = st.session_state.ebay_selected.get(item_id, False)
-            card_border = "#2563eb" if is_selected else flag_color
-            ebay_badge = ""
-            if ebay_status == "draft" and ebay_item_id:
-                ebay_badge = f"<a href='https://www.ebay.com/itm/{ebay_item_id}' target='_blank' style='background:#eff6ff; color:#2563eb; border:1px solid #93c5fd; border-radius:4px; font-size:0.6rem; font-weight:600; padding:2px 7px; text-decoration:none; margin-left:6px;'>🏷️ eBay Draft #{ebay_item_id}</a>"
+        for row in rows:
+            cols = st.columns(cols_per_row)
+            for col_idx, t in enumerate(row):
+                with cols[col_idx]:
+                    item_id   = t["id"]
+                    is_sel    = st.session_state.ebay_selected.get(item_id, False)
+                    cond_col  = "#16a34a" if t["condition"] == "new" else "#2563eb"
+                    cond_lbl  = "NEW" if t["condition"] == "new" else "USED"
+                    border    = "1.5px solid #2563eb" if is_sel else ("1.5px solid #2563eb" if t["ebay_status"] == "draft" else "0.5px solid #e2e8f0")
+                    border_l  = "3px solid #2563eb" if t["ebay_status"] == "draft" else ""
+                    ref_parts = []
+                    if t["price_used"] > 0: ref_parts.append(f"U:${t['price_used']:.0f}")
+                    if t["price_new"]  > 0: ref_parts.append(f"N:${t['price_new']:.0f}")
+                    ref_str = "  ".join(ref_parts)
 
-            st.markdown(
-                f"<div style='background:#ffffff; border:1.5px solid {card_border}; "
-                f"border-radius:12px; padding:0.75rem; margin-bottom:0.5rem;'>",
-                unsafe_allow_html=True
-            )
+                    status_badge = ""
+                    if t["ebay_status"] == "draft" and t["ebay_item_id"]:
+                        status_badge = f"<a href='https://www.ebay.com/itm/{t['ebay_item_id']}' target='_blank' style='background:#eff6ff;color:#2563eb;border:0.5px solid #bfdbfe;border-radius:10px;font-size:9px;font-weight:700;padding:2px 7px;text-decoration:none;'>eBay Draft</a>"
+                    elif t["price_note"] in ("new","used"):
+                        status_badge = f"<span style='background:#fffbeb;color:#d97706;border-radius:10px;font-size:9px;font-weight:700;padding:2px 7px;'>⚠ fallback</span>"
 
-            chk_col, img_col, fields_col = st.columns([0.3, 1, 4])
-            with chk_col:
-                checked = st.checkbox("Select", value=is_selected, key=f"chk_{item_id}",
-                                       label_visibility="collapsed")
-                if checked != is_selected:
-                    st.session_state.ebay_selected[item_id] = checked
-                    st.rerun()
+                    # Card wrapper
+                    st.markdown(f"""
+                    <div style='background:#fff; border:{border}; border-radius:12px; overflow:hidden; margin-bottom:2px;
+                    {"border-left:" + border_l + ";" if border_l else ""}'>
+                      <div style='position:relative; height:130px; background:#f8fafc; overflow:hidden; cursor:pointer;'>
+                        {"<img src='" + t['url'] + "' style='width:100%;height:100%;object-fit:cover;display:block;'/>" if t['url'] else "<div style='width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:#cbd5e1;'>📷</div>"}
+                        <div style='position:absolute;top:6px;right:6px;'>{status_badge}</div>
+                      </div>
+                      <div style='padding:8px 10px 4px;'>
+                        <div style='font-size:12px;font-weight:600;color:#0f172a;line-height:1.3;min-height:32px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>{t['title']}</div>
+                        <div style='font-size:10px;color:#94a3b8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{t['category']}</div>
+                        <div style='display:flex;align-items:baseline;justify-content:space-between;margin-top:6px;'>
+                          <div style='font-size:18px;font-weight:800;color:#0f172a;letter-spacing:-0.3px;'>${t['price']:.2f}</div>
+                          <div style='font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:{"#f0fdf4" if t["condition"]=="new" else "#eff6ff"};color:{cond_col};'>{cond_lbl}</div>
+                        </div>
+                        {"<div style='font-size:10px;color:#94a3b8;margin-top:2px;'>" + ref_str + "</div>" if ref_str else ""}
+                      </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-            with img_col:
-                if url:
-                    st.markdown(f"<img src='{url}' style='width:100%; border-radius:8px; display:block; max-height:140px; object-fit:cover;' />", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div style='background:#0a0a0c; border:1px solid #1e1e28; border-radius:6px; height:100px; display:flex; align-items:center; justify-content:center; color:#4a4a5a; font-size:1.2rem;'>📷</div>", unsafe_allow_html=True)
-                sku_display = pid.rsplit(".", 1)[0] if pid else "—"
-                st.markdown(
-                    f"<div style='color:#4a4a5a; font-size:0.6rem; text-align:center; margin-top:3px;'>{sku_display}</div>",
-                    unsafe_allow_html=True)
-
-            with fields_col:
-                # Title — full width
-                new_title = st.text_input(
-                    "Title", value=title, key=f"title_{item_id}",
-                    label_visibility="collapsed", placeholder="Title"
-                )
-                if new_title.strip() and new_title.strip() != title:
-                    update_field(item_id, "title", new_title.strip()[:80])
-                    st.cache_data.clear()
-
-                # Row: Price | Condition | Qty
-                pc1, pc2, pc3 = st.columns([2, 1, 2])
-
-                with pc1:
-                    st.markdown("<div class='field-label'>Price</div>", unsafe_allow_html=True)
-                    # Use text_input so there are no +/- spinner buttons
-                    # Key includes price so it re-renders when condition changes
-                    price_key = f"price_{item_id}_{round(price, 2)}"
-                    price_input = st.text_input(
-                        "Price", value=f"{price:.2f}",
-                        key=price_key, label_visibility="collapsed"
-                    )
-                    try:
-                        new_price = round(float(price_input.replace("$","").strip()), 2)
-                        if new_price != round(price, 2):
-                            update_field(item_id, "price", new_price)
-                            update_field(item_id, "price_note", "")
-                            st.cache_data.clear()
-                    except ValueError:
-                        pass
-                    if has_dual:
-                        p_used_str = f"${price_used:.2f}" if price_used > 0 else "—"
-                        p_new_str  = f"${price_new:.2f}"  if price_new  > 0 else "—"
-                        st.markdown(
-                            f"<div style='color:#64748b; font-size:0.6rem;'>U:{p_used_str} &nbsp; N:{p_new_str}</div>",
-                            unsafe_allow_html=True)
-                    if price_note in ("new", "used"):
-                        st.markdown(
-                            f"<div style='color:#d97706; font-size:0.6rem;'>⚠ fallback to {price_note}</div>",
-                            unsafe_allow_html=True)
-
-                with pc2:
-                    st.markdown("<div class='field-label'>Cond.</div>", unsafe_allow_html=True)
-                    new_cond = st.selectbox(
-                        "Condition", ["used", "new"],
-                        index=1 if condition == "new" else 0,
-                        key=f"cond_{item_id}", label_visibility="collapsed"
-                    )
-                    if new_cond != condition:
-                        price_updated = switch_condition(item_id, new_cond, price_used, price_new)
-                        if not price_updated:
-                            st.toast("Condition updated — update price manually", icon="⚠️")
-                        st.cache_data.clear()
+                    # Checkbox for eBay selection
+                    checked = st.checkbox("Select for eBay", value=is_sel,
+                                          key=f"chk_{item_id}", label_visibility="collapsed")
+                    if checked != is_sel:
+                        st.session_state.ebay_selected[item_id] = checked
                         st.rerun()
 
-                with pc3:
-                    st.markdown("<div class='field-label'>Quantity</div>", unsafe_allow_html=True)
+                    # Quantity stepper with red/green symbols
                     q1, q2, q3 = st.columns([1, 1, 1])
                     with q1:
-                        if st.button("−", key=f"minus_{item_id}", use_container_width=True):
-                            new_qty = max(0, current_qty - 1)
+                        if st.button("−", key=f"minus_{item_id}", use_container_width=True,
+                                     help="Decrease quantity"):
+                            new_qty = max(0, t["qty"] - 1)
                             st.session_state.quantities[item_id] = new_qty
                             update_field(item_id, "quantity", new_qty)
-                            st.cache_data.clear()
                             st.rerun()
                     with q2:
                         st.markdown(
-                            f"<div style='text-align:center; font-size:0.9rem; font-weight:600; "
-                            f"color:#111827; padding-top:5px;'>{current_qty}</div>", unsafe_allow_html=True)
+                            f"<div style='text-align:center;font-size:14px;font-weight:700;color:#0f172a;padding-top:6px;'>{t['qty']}</div>",
+                            unsafe_allow_html=True)
                     with q3:
-                        if st.button("+", key=f"plus_{item_id}", use_container_width=True):
-                            new_qty = current_qty + 1
+                        if st.button("+", key=f"plus_{item_id}", use_container_width=True,
+                                     help="Increase quantity"):
+                            new_qty = t["qty"] + 1
                             st.session_state.quantities[item_id] = new_qty
                             update_field(item_id, "quantity", new_qty)
+                            st.rerun()
+
+                    # Style the +/- buttons with JS
+                    st.markdown(f"""
+                    <script>
+                    (function() {{
+                        var btns = document.querySelectorAll('[data-testid="stButton"] button');
+                        btns.forEach(function(btn) {{
+                            if (btn.innerText === '−') btn.style.color = '#dc2626';
+                            if (btn.innerText === '+') btn.style.color = '#16a34a';
+                        }});
+                    }})();
+                    </script>
+                    """, unsafe_allow_html=True)
+
+                    # Expandable detail
+                    with st.expander("Edit details", expanded=False):
+                        new_title = st.text_input("Title", value=t["title"],
+                            key=f"title_{item_id}", label_visibility="visible")
+                        if new_title.strip() and new_title.strip() != t["title"]:
+                            update_field(item_id, "title", new_title.strip()[:80])
+                            st.cache_data.clear()
+
+                        pc1, pc2 = st.columns(2)
+                        with pc1:
+                            price_key = f"price_{item_id}_{round(t['price'],2)}"
+                            price_input = st.text_input("Price", value=f"{t['price']:.2f}",
+                                key=price_key)
+                            try:
+                                new_price = round(float(price_input.replace("$","").strip()), 2)
+                                if new_price != round(t["price"], 2):
+                                    update_field(item_id, "price", new_price)
+                                    update_field(item_id, "price_note", "")
+                                    st.cache_data.clear()
+                            except ValueError:
+                                pass
+                        with pc2:
+                            new_cond = st.selectbox("Condition", ["used","new"],
+                                index=1 if t["condition"]=="new" else 0,
+                                key=f"cond_{item_id}")
+                            if new_cond != t["condition"]:
+                                price_updated = switch_condition(item_id, new_cond, t["price_used"], t["price_new"])
+                                if not price_updated:
+                                    st.toast("Condition updated — update price manually", icon="⚠️")
+                                st.cache_data.clear()
+                                st.rerun()
+
+                        matched_label = find_best_label(t["category"], t["cat_id"])
+                        options = ["— search or select —"] + CATEGORY_LABELS
+                        current_index = options.index(matched_label) if matched_label in options else 0
+                        selected_label = st.selectbox("eBay Category", options=options,
+                            index=current_index, key=f"cat_{item_id}")
+                        if selected_label != "— search or select —" and selected_label != matched_label:
+                            supabase.table("listings").update({
+                                "ebay_category":    LABEL_TO_NAME[selected_label],
+                                "ebay_category_id": LABEL_TO_ID[selected_label],
+                            }).eq("id", item_id).execute()
                             st.cache_data.clear()
                             st.rerun()
 
-                # Row: Category | Cat ID | Weight
-                cc1, cc2, cc3 = st.columns([4, 1, 1])
-
-                with cc1:
-                    st.markdown("<div class='field-label'>eBay Category</div>", unsafe_allow_html=True)
-                    matched_label = find_best_label(category, cat_id)
-                    options       = ["— search or select —"] + CATEGORY_LABELS
-                    current_index = options.index(matched_label) if matched_label in options else 0
-                    selected_label = st.selectbox(
-                        "eBay Category", options=options, index=current_index,
-                        key=f"cat_{item_id}", label_visibility="collapsed"
-                    )
-                    if selected_label != "— search or select —" and selected_label != matched_label:
-                        supabase.table("listings").update({
-                            "ebay_category":    LABEL_TO_NAME[selected_label],
-                            "ebay_category_id": LABEL_TO_ID[selected_label],
-                        }).eq("id", item_id).execute()
-                        st.cache_data.clear()
-                        st.rerun()
-
-                with cc2:
-                    st.markdown("<div class='field-label'>Cat. ID</div>", unsafe_allow_html=True)
-                    display_cat_id  = LABEL_TO_ID.get(matched_label, cat_id) if matched_label else cat_id
-                    new_cat_id_text = st.text_input(
-                        "Cat ID", value=display_cat_id,
-                        key=f"catid_{item_id}", label_visibility="collapsed"
-                    )
-                    if new_cat_id_text.strip() and new_cat_id_text.strip() != display_cat_id:
-                        update_field(item_id, "ebay_category_id", new_cat_id_text.strip())
-                        st.cache_data.clear()
-
-                with cc3:
-                    st.markdown("<div class='field-label'>oz</div>", unsafe_allow_html=True)
-                    new_oz = st.number_input(
-                        "oz", value=weight_oz, step=0.1, format="%.1f",
-                        key=f"oz_{item_id}", label_visibility="collapsed"
-                    )
-                    if round(new_oz, 1) != round(weight_oz, 1):
-                        update_field(item_id, "weight_oz", round(new_oz, 1))
-                        update_field(item_id, "weight_lb", round(new_oz / 16, 2))
-                        st.cache_data.clear()
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
         st.divider()
+
+        # Issues        st.divider()
 
         # Issues
         st.markdown("<div class='section-label'>Issues</div>", unsafe_allow_html=True)
