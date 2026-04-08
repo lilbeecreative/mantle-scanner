@@ -1225,12 +1225,96 @@ elif st.session_state.active_tab == "dashboard":
                 "qty": current_qty, "item": item,
             })
 
-        # Render tile grid — 3 columns on desktop
-        cols_per_row = 3
-        rows = [tiles_data[i:i+cols_per_row] for i in range(0, len(tiles_data), cols_per_row)]
+        # Render tile grid — 2 cols mobile, 3 cols desktop
+        # Detect mobile via screen width injected into session state
+        if "screen_cols" not in st.session_state:
+            st.session_state.screen_cols = 3
+        st.markdown("""
+        <script>
+        (function() {
+            var cols = window.innerWidth < 768 ? 2 : 3;
+            var existing = window.sessionStorage.getItem('tile_cols');
+            if (existing != cols) {
+                window.sessionStorage.setItem('tile_cols', cols);
+            }
+        })();
+        </script>
+        """, unsafe_allow_html=True)
 
-        for row in rows:
-            cols = st.columns(cols_per_row)
+        import streamlit.components.v1 as components
+        screen_w = st.session_state.get("screen_cols", 3)
+
+        # Use CSS grid via HTML — most reliable responsive approach
+        # Build all tiles as pure HTML in a responsive CSS grid
+        tile_htmls = []
+        for t in tiles_data:
+            item_id   = t["id"]
+            is_sel    = st.session_state.ebay_selected.get(item_id, False)
+            cond_col  = "#16a34a" if t["condition"] == "new" else "#3b82f6"
+            cond_lbl  = "NEW" if t["condition"] == "new" else "USED"
+            border    = "#2563eb" if is_sel else "#2d3348"
+            ref_parts = []
+            if t["price_used"] > 0: ref_parts.append(f"U:${t['price_used']:.0f}")
+            if t["price_new"]  > 0: ref_parts.append(f"N:${t['price_new']:.0f}")
+            ref_str = "  ".join(ref_parts)
+
+            status_badge = ""
+            if t["ebay_status"] == "draft" and t["ebay_item_id"]:
+                status_badge = f"<a href='https://www.ebay.com/itm/{t['ebay_item_id']}' target='_blank' style='background:rgba(37,99,235,0.8);color:#fff;border-radius:5px;font-size:9px;font-weight:700;padding:2px 6px;text-decoration:none;'>eBay</a>"
+            elif t["price_note"] in ("new","used"):
+                status_badge = f"<span style='background:rgba(245,158,11,0.8);color:#fff;border-radius:5px;font-size:9px;font-weight:700;padding:2px 6px;'>⚠</span>"
+
+            thumb_src = photo_url(t['pid'], thumb=True) if t['pid'] else ""
+            photo_html = f"<img src='{thumb_src}' style='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;' loading='lazy'/>" if thumb_src else "<div style='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#3d4663;'>📷</div>"
+
+            tile_htmls.append(f"""
+            <div style='background:#1a1f2e;border:1.5px solid {border};border-radius:14px;
+            overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.35);
+            {"border-left:3px solid #2563eb;" if t["ebay_status"]=="draft" else ""}'>
+              <div style='position:relative;width:100%;padding-top:100%;background:#161925;overflow:hidden;'>
+                {photo_html}
+                <div style='position:absolute;top:7px;left:7px;right:7px;display:flex;justify-content:space-between;align-items:flex-start;'>
+                  <div style='background:rgba(0,0,0,0.65);border-radius:5px;padding:2px 7px;'>
+                    <span style='color:{cond_col};font-size:9px;font-weight:700;'>{cond_lbl}</span>
+                  </div>
+                  <div>{status_badge}</div>
+                </div>
+                <div style='position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.85));padding:28px 10px 8px;'>
+                  <div style='color:#fff;font-size:22px;font-weight:900;letter-spacing:-0.5px;line-height:1;'>${t['price']:.2f}</div>
+                  {"<div style='color:#cbd5e1;font-size:10px;font-weight:600;margin-top:2px;'>" + ref_str + "</div>" if ref_str else ""}
+                </div>
+              </div>
+              <div style='padding:10px 11px 8px;'>
+                <div style='font-size:13px;font-weight:700;color:#f8fafc;line-height:1.4;
+                min-height:38px;display:-webkit-box;-webkit-line-clamp:2;
+                -webkit-box-orient:vertical;overflow:hidden;'>{t['title']}</div>
+                <div style='font-size:10px;color:#475569;margin-top:3px;white-space:nowrap;
+                overflow:hidden;text-overflow:ellipsis;'>{t['category']}</div>
+              </div>
+            </div>""")
+
+        # Render grid via HTML — CSS handles 2 vs 3 cols automatically
+        grid_html = f"""
+        <style>
+        .tile-grid {{
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 12px;
+        }}
+        @media (max-width: 768px) {{
+            .tile-grid {{ grid-template-columns: repeat(2, 1fr); gap: 8px; }}
+        }}
+        </style>
+        <div class="tile-grid">{''.join(tile_htmls)}</div>
+        """
+        st.markdown(grid_html, unsafe_allow_html=True)
+
+        # Controls rendered below - one per item using columns
+        # Use a hidden index to match tile order
+        ctrl_rows = [tiles_data[i:i+3] for i in range(0, len(tiles_data), 3)]
+        for row in ctrl_rows:
+            cols = st.columns(3)
             for col_idx, t in enumerate(row):
                 with cols[col_idx]:
                     item_id   = t["id"]
