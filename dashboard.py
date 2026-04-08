@@ -213,6 +213,18 @@ st.markdown("""
     .tab-auction   [data-testid="baseButton-primary"] { background: #b45309 !important; }
     .tab-settings  [data-testid="baseButton-primary"] { background: #475569 !important; }
 
+    /* Expander label dark mode */
+    [data-testid="stExpander"] summary span p {
+        color: #94a3b8 !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+    }
+    [data-testid="stExpander"] summary:hover span p {
+        color: #e2e8f0 !important;
+    }
+    [data-testid="stExpander"] summary svg {
+        fill: #64748b !important;
+    }
     /* Tile grid quantity buttons */
     [data-testid="stButton"] button[kind="secondary"]:has(> div > p:only-child) {
         font-size: 16px !important;
@@ -1427,7 +1439,7 @@ elif st.session_state.active_tab == "dashboard":
                             st.error(f"Re-scan failed: {e}")
 
                     # Expandable detail
-                    with st.expander("Edit details", expanded=False):
+                    with st.expander("✏️  Edit details", expanded=False):
                         new_title = st.text_input("Title", value=t["title"],
                             key=f"title_{item_id}", label_visibility="visible")
                         if new_title.strip() and new_title.strip() != t["title"]:
