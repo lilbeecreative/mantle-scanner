@@ -207,7 +207,6 @@ st.markdown("""
 
     /* Tab color coding */
     .tab-dashboard [data-testid="baseButton-primary"] { background: #2563eb !important; }
-    .tab-camera    [data-testid="baseButton-primary"] { background: #ea580c !important; }
     .tab-batch     [data-testid="baseButton-primary"] { background: #0891b2 !important; }
     .tab-auction   [data-testid="baseButton-primary"] { background: #b45309 !important; }
     .tab-settings  [data-testid="baseButton-primary"] { background: #475569 !important; }
@@ -711,7 +710,7 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
 #  DATA FETCH
 # ------------------------------------------------------------------ #
 
-@st.cache_data(ttl=120)
+@st.cache_data(ttl=300)
 def fetch_listings():
     result = (
         supabase.table("listings")
@@ -776,19 +775,12 @@ box-shadow: 0 1px 4px rgba(0,0,0,0.06);'>
 
 # Color-coded nav toolbar — separated from page content
 st.markdown("<div style='background:#161925; border-bottom:1px solid #2d3348; padding:4px 8px;'>", unsafe_allow_html=True)
-t1, t2, t3, t5, t6, t7 = st.columns([2, 1.5, 1.5, 1.5, 1, 1.5])
+t1, t3, t5, t6, t7 = st.columns([2, 1.5, 1.5, 1, 1.5])
 with t1:
     st.markdown("<div class='tab-dashboard'>", unsafe_allow_html=True)
     if st.button("📊  Batch Dashboard", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "dashboard" else "secondary"):
         st.session_state.active_tab = "dashboard"
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-with t2:
-    st.markdown("<div class='tab-camera'>", unsafe_allow_html=True)
-    if st.button("📸  Scan New Items", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "camera" else "secondary"):
-        st.session_state.active_tab = "camera"
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 with t3:
@@ -837,190 +829,10 @@ with t7:
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ================================================================== #
-#  TAB: CAMERA SCAN
+#  TAB: BATCH UPLOAD
 # ================================================================== #
 
-if st.session_state.active_tab == "camera":
-
-    from PIL import Image, ExifTags
-    import io as _io
-
-    def fix_rotation(img_bytes):
-        try:
-            img = Image.open(_io.BytesIO(img_bytes))
-            exif = img._getexif()
-            if exif:
-                ok = next((k for k, v in ExifTags.TAGS.items() if v == "Orientation"), None)
-                if ok and ok in exif:
-                    rot = {3:180, 6:270, 8:90}.get(exif[ok])
-                    if rot:
-                        img = img.rotate(rot, expand=True)
-            buf = _io.BytesIO()
-            img.save(buf, format="JPEG", quality=90)
-            return buf.getvalue()
-        except Exception:
-            return img_bytes
-
-    def cam_upload(img_bytes, group_id, idx):
-        fixed = fix_rotation(img_bytes)
-        dt = datetime.now()
-        fn = f"{dt.strftime('%d%m%y')}_{dt.strftime('%H%M%S')}_{idx}.jpg"
-        supabase.storage.from_("part-photos").upload(path=fn, file=fixed, file_options={"content-type":"image/jpeg","upsert":"true"})
-        supabase.table("group_photos").insert({"group_id":group_id,"photo_id":fn}).execute()
-
-    for k,v in [("cam_batch_id",None),("cam_condition","used"),("cam_items",[]),("cam_group_id",None),("cam_photos",[]),("cam_qty",1)]:
-        if k not in st.session_state: st.session_state[k] = v
-
-    if st.session_state.cam_batch_id is None:
-        st.markdown("""
-        <div style='text-align:center; padding:2rem 0 1rem;'>
-            <div style='font-size:2.5rem; margin-bottom:0.5rem;'>📸</div>
-            <div style='color:#e2e8f0; font-size:1.1rem; font-weight:600;'>Camera Scan</div>
-            <div style='color:#64748b; font-size:0.82rem; margin-top:0.3rem;'>Take up to 10 photos per item</div>
-        </div>""", unsafe_allow_html=True)
-        st.markdown("<div class='field-label' style='text-align:center;'>Condition for this Batch</div>", unsafe_allow_html=True)
-        ca, cb = st.columns(2)
-        with ca:
-            if st.button("✓  Used" if st.session_state.cam_condition=="used" else "Used", use_container_width=True, key="cam_cond_used", type="primary" if st.session_state.cam_condition=="used" else "secondary"):
-                st.session_state.cam_condition = "used"; st.rerun()
-        with cb:
-            if st.button("✓  New" if st.session_state.cam_condition=="new" else "New", use_container_width=True, key="cam_cond_new", type="primary" if st.session_state.cam_condition=="new" else "secondary"):
-                st.session_state.cam_condition = "new"; st.rerun()
-        st.markdown("<div style='height:1rem;'></div>", unsafe_allow_html=True)
-        if st.button("🚀  Start Camera Batch", use_container_width=True, type="primary", key="start_cam_batch"):
-            batch_id = str(uuid.uuid4())
-            st.session_state.cam_batch_id = batch_id
-            st.session_state.cam_items    = []
-            st.session_state.cam_photos   = []
-            st.session_state.cam_qty      = 1
-            # Auto-create first item group so camera opens immediately
-            result = supabase.table("listing_groups").insert({
-                "session_id": batch_id,
-                "status":     "waiting",
-                "quantity":   1,
-                "condition":  st.session_state.cam_condition,
-            }).execute()
-            st.session_state.cam_group_id = result.data[0]["id"]
-            st.rerun()
-    else:
-        total_cam = len(st.session_state.cam_items)
-        cond_color = "#22c55e" if st.session_state.cam_condition=="new" else "#2196F3"
-        st.markdown(f"""
-        <div style='background:#1e2130; border:1px solid #2d3348; border-left:4px solid {cond_color};
-        border-radius:10px; padding:0.65rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
-            <div>
-                <span style='color:#e2e8f0; font-size:0.9rem; font-weight:600;'>Camera Batch</span>
-                <span style='color:#64748b; font-size:0.72rem; margin-left:10px;'>
-                    {total_cam} items · <span style='color:{cond_color};'>{st.session_state.cam_condition.title()}</span>
-                </span>
-            </div>
-        </div>""", unsafe_allow_html=True)
-
-        if st.session_state.cam_group_id is None:
-            if st.session_state.cam_items:
-                st.markdown("<div class='section-label'>Items scanned</div>", unsafe_allow_html=True)
-                for i, item in enumerate(reversed(st.session_state.cam_items)):
-                    idx = total_cam - i
-                    st.markdown(f"""<div class='batch-card processing'>
-                        <div style='display:flex; justify-content:space-between; align-items:center;'>
-                            <div><span style='color:#e2e8f0; font-size:0.82rem; font-weight:500;'>Item {idx}</span>
-                            <span style='color:#64748b; font-size:0.7rem; margin-left:8px;'>{item.get("photo_count",0)} photos · Qty {item.get("qty",1)}</span></div>
-                            <span class='status-pill pill-processing'>Processing...</span>
-                        </div></div>""", unsafe_allow_html=True)
-                st.divider()
-            b1, b2, b3 = st.columns([2,2,1])
-            with b1:
-                if st.button("📸  Scan Next Item", use_container_width=True, type="primary"):
-                    result = supabase.table("listing_groups").insert({"session_id":st.session_state.cam_batch_id,"status":"waiting","quantity":1,"condition":st.session_state.cam_condition}).execute()
-                    st.session_state.cam_group_id = result.data[0]["id"]
-                    st.session_state.cam_photos = []; st.session_state.cam_qty = 1; st.rerun()
-            with b2:
-                if st.button("🏁  End Batch", use_container_width=True, type="secondary"):
-                    st.session_state.cam_batch_id = None; st.session_state.cam_items = []
-                    st.session_state.cam_group_id = None; st.session_state.cam_photos = []
-                    st.cache_data.clear(); st.rerun()
-            with b3:
-                if st.button("✗  Cancel", use_container_width=True, type="secondary"):
-                    st.session_state.cam_batch_id = None; st.session_state.cam_items = []
-                    st.session_state.cam_group_id = None; st.session_state.cam_photos = []; st.rerun()
-        else:
-            item_num = total_cam + 1
-            photo_count = len(st.session_state.cam_photos)
-            remaining = 10 - photo_count
-            st.markdown(f"""
-            <div style='background:#0d1b38; border:1.5px solid #3b82f6; border-radius:12px;
-            padding:0.75rem 1rem; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;'>
-                <span style='color:#e2e8f0; font-size:0.9rem; font-weight:600;'>Item {item_num}</span>
-                <span style='color:#60b4ff; font-size:0.82rem; font-weight:500;'>{photo_count}/10 photos</span>
-            </div>""", unsafe_allow_html=True)
-            if st.session_state.cam_photos:
-                tc = st.columns(min(len(st.session_state.cam_photos),5))
-                for col, pb in zip(tc, st.session_state.cam_photos):
-                    with col: st.image(pb, use_container_width=True)
-            if remaining > 0:
-                st.markdown(f"<div style='color:#64748b; font-size:0.72rem; margin-bottom:4px;'>Photo {photo_count+1} of up to 10</div>", unsafe_allow_html=True)
-                cam_img = st.camera_input("Take photo", label_visibility="collapsed", key=f"cam_{st.session_state.cam_group_id}_{photo_count}")
-                if cam_img:
-                    st.session_state.cam_photos.append(cam_img.read()); st.rerun()
-            else:
-                st.success("Maximum 10 photos — tap Done to process.")
-            st.markdown("<div class='field-label' style='margin-top:0.75rem;'>Quantity</div>", unsafe_allow_html=True)
-            qq1,qq2,qq3 = st.columns([1,2,1])
-            with qq1:
-                if st.button("−", key="cam_minus", use_container_width=True):
-                    if st.session_state.cam_qty > 1: st.session_state.cam_qty -= 1; st.rerun()
-            with qq2:
-                st.markdown(f"<div style='text-align:center; font-size:1.3rem; font-weight:700; color:#fff; padding-top:3px;'>{st.session_state.cam_qty}</div>", unsafe_allow_html=True)
-            with qq3:
-                if st.button("+", key="cam_plus", use_container_width=True):
-                    st.session_state.cam_qty += 1; st.rerun()
-            da, db = st.columns([3,1])
-            with da:
-                done_disabled = len(st.session_state.cam_photos) == 0
-                if st.button("✓  Done — Send to Scanner" if not done_disabled else "Take at least one photo", use_container_width=True, type="primary", disabled=done_disabled):
-                    with st.spinner(f"Uploading {len(st.session_state.cam_photos)} photos..."):
-                        group_id = st.session_state.cam_group_id
-                        uploaded = 0
-                        errors = []
-                        for i, pb in enumerate(st.session_state.cam_photos):
-                            try:
-                                cam_upload(pb, group_id, i)
-                                uploaded += 1
-                            except Exception as e:
-                                errors.append(f"Photo {i+1}: {e}")
-                        if errors:
-                            for err in errors:
-                                st.error(err)
-                        supabase.table("listing_groups").update({
-                            "condition": st.session_state.cam_condition,
-                            "quantity":  st.session_state.cam_qty,
-                            "status":    "pending"
-                        }).eq("id", group_id).execute()
-                        st.session_state.cam_items.append({
-                            "group_id":    group_id,
-                            "condition":   st.session_state.cam_condition,
-                            "qty":         st.session_state.cam_qty,
-                            "status":      "pending",
-                            "photo_count": uploaded
-                        })
-                        st.success(f"✅ {uploaded} photo(s) uploaded — item sent to scanner!")
-                        time.sleep(1.5)
-                        st.session_state.cam_group_id = None
-                        st.session_state.cam_photos   = []
-                        st.session_state.cam_qty      = 1
-                        st.cache_data.clear()
-                        st.rerun()
-            with db:
-                if st.button("✗  Cancel Item", use_container_width=True, type="secondary"):
-                    try: supabase.table("listing_groups").delete().eq("id",st.session_state.cam_group_id).execute()
-                    except: pass
-                    st.session_state.cam_group_id = None; st.session_state.cam_photos = []; st.session_state.cam_qty = 1; st.rerun()
-
-# ================================================================== #
-#  TAB: FILE UPLOAD
-# ================================================================== #
-
-elif st.session_state.active_tab == "batch":
+if st.session_state.active_tab == "batch":
 
     from PIL import Image, ExifTags
     import io as _io
@@ -1463,7 +1275,7 @@ elif st.session_state.active_tab == "dashboard":
                                           key=f"chk_{item_id}", label_visibility="collapsed")
                     if checked != is_sel:
                         st.session_state.ebay_selected[item_id] = checked
-                        st.rerun()
+                        st.rerun()  # no cache clear needed
 
                     # Quantity stepper with red/green symbols
                     q1, q2, q3 = st.columns([1, 1, 1])
@@ -1536,7 +1348,6 @@ elif st.session_state.active_tab == "dashboard":
                                 price_updated = switch_condition(item_id, new_cond, t["price_used"], t["price_new"])
                                 if not price_updated:
                                     st.toast("Condition updated — update price manually", icon="⚠️")
-                                st.cache_data.clear()
                                 st.rerun()
 
                         matched_label = find_best_label(t["category"], t["cat_id"])
