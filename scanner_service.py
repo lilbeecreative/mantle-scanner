@@ -430,7 +430,7 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
                     time.sleep(10)
                 elif "404" in str(_e) or "no longer available" in str(_e):
                     print(f"   ⚠️  Model deprecated, switching to fallback...")
-                    global model; model = "models/gemini-1.5-flash"
+                    model = "models/gemini-1.5-flash"  # local fallback
                 else:
                     raise
         if id_resp is None:
@@ -485,7 +485,7 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
                     time.sleep(10)
                 elif "404" in str(_e) or "no longer available" in str(_e):
                     print(f"   ⚠️  Model deprecated, switching to fallback...")
-                    global model; model = "models/gemini-1.5-flash"
+                    model = "models/gemini-1.5-flash"  # local fallback
                 else:
                     raise
         if response is None:
