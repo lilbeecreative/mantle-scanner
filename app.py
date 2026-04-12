@@ -466,8 +466,8 @@ def photo_url(photo_id: str, thumb: bool = False) -> str:
     if not photo_id or str(photo_id) in ("0", "", "nan"):
         return ""
     if thumb:
-        # 500px square thumbnail — readable but fast
-        return f"{SUPABASE_URL}/storage/v1/render/image/public/part-photos/{photo_id}?width=500&height=500&resize=cover&quality=80"
+        # Direct URL — preserves EXIF orientation
+        return f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
     return f"{SUPABASE_URL}/storage/v1/object/public/part-photos/{photo_id}"
 
 # ------------------------------------------------------------------ #
