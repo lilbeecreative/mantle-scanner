@@ -60,7 +60,7 @@ def resolve_model():
         gen_models = [m for m in all_models if "gemini" in m.lower()]
         print(f"Available models: {gen_models}")
         preferred = [
-            "gemini-2.5-pro", "gemini-2.5-flash",
+            "gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-pro",
             "gemini-2.0-pro", "gemini-2.0-flash-001",
             "gemini-2.0-flash-exp", "gemini-1.5-pro",
             "gemini-1.5-flash", "gemini-pro"
