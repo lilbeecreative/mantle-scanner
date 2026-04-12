@@ -973,6 +973,7 @@ if st.session_state.active_tab == "batch":
             </div>""", unsafe_allow_html=True)
 
             # File uploader — this is the MAIN action, always visible
+            st.markdown("<div style='color:#64748b;font-size:0.72rem;margin-bottom:4px;'>📐 Tip: shoot in landscape (horizontal) for best results</div>", unsafe_allow_html=True)
             uploaded_files = st.file_uploader(
                 "Tap to take photo or select from library",
                 type=["jpg","jpeg","png","heic"],
