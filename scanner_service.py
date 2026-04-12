@@ -110,7 +110,9 @@ def to_jpeg_bytes(raw_bytes: bytes) -> bytes:
         pillow_heif.register_heif_opener()
     except ImportError:
         pass
+    from PIL import ImageOps
     img = Image.open(io.BytesIO(raw_bytes))
+    img = ImageOps.exif_transpose(img)
     if img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
     buf = io.BytesIO()
