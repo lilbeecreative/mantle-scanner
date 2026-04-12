@@ -847,7 +847,9 @@ if st.session_state.active_tab == "batch":
                     rot = {3:180,6:270,8:90}.get(exif[ok])
                     if rot: img = img.rotate(rot, expand=True)
             buf = _io.BytesIO(); img.save(buf, format="JPEG", quality=90); return buf.getvalue()
-        except: return img_bytes
+        except Exception as _re:
+            print(f"⚠️  Rotation fix failed: {_re}")
+            return img_bytes
 
     def file_upload_photo(f_bytes, group_id, idx):
         fixed = fix_rot_b(f_bytes)
