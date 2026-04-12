@@ -1266,7 +1266,7 @@ elif st.session_state.active_tab == "dashboard":
                 status_badge = f"<span style='background:rgba(245,158,11,0.8);color:#fff;border-radius:5px;font-size:9px;font-weight:700;padding:2px 6px;'>⚠</span>"
 
             thumb_src = photo_url(t['pid'], thumb=True) if t['pid'] else ""
-            photo_html = f"<img src='{thumb_src}' style='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;' loading='lazy'/>" if thumb_src else "<div style='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#3d4663;'>📷</div>"
+            photo_html = f"<img src='{thumb_src}' style='position:absolute;inset:0;width:100%;height:100%;object-fit:cover;image-orientation:from-image;' loading='lazy'/>" if thumb_src else "<div style='position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#3d4663;'>📷</div>"
 
             tile_htmls.append(f"""
             <div style='background:#1a1f2e;border:1.5px solid {border};border-radius:14px;
@@ -1340,7 +1340,7 @@ elif st.session_state.active_tab == "dashboard":
                     <div style='background:#1e2130; border:{border}; border-radius:12px; overflow:hidden; margin-bottom:2px;
                     {"border-left:" + border_l + ";" if border_l else ""}'>
                       <div style='position:relative; height:130px; background:#161925; overflow:hidden; cursor:pointer;'>
-                        {"<img src='" + photo_url(t['pid'], thumb=True) + "' style='width:100%;height:100%;object-fit:cover;display:block;'/>" if t['pid'] else "" if t['url'] else "<div style='width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:#cbd5e1;'>📷</div>"}
+                        {"<img src='" + photo_url(t['pid'], thumb=True) + "' style='width:100%;height:100%;object-fit:cover;image-orientation:from-image;display:block;'/>" if t['pid'] else "" if t['url'] else "<div style='width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;color:#cbd5e1;'>📷</div>"}
                         <div style='position:absolute;top:6px;right:6px;'>{status_badge}</div>
                       </div>
                       <div style='padding:8px 10px 4px;'>
