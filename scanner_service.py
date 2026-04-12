@@ -428,6 +428,9 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
                 if "503" in str(_e) or "UNAVAILABLE" in str(_e):
                     print(f"   ⏳ Gemini busy, retrying in 10s...")
                     time.sleep(10)
+                elif "404" in str(_e) or "no longer available" in str(_e):
+                    print(f"   ⚠️  Model deprecated, switching to fallback...")
+                    model = "models/gemini-1.5-flash"
                 else:
                     raise
         if id_resp is None:
@@ -480,6 +483,9 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
                 if "503" in str(_e) or "UNAVAILABLE" in str(_e):
                     print(f"   ⏳ Gemini busy, retrying in 10s (attempt {_attempt+1}/3)...")
                     time.sleep(10)
+                elif "404" in str(_e) or "no longer available" in str(_e):
+                    print(f"   ⚠️  Model deprecated, switching to fallback...")
+                    model = "models/gemini-1.5-flash"
                 else:
                     raise
         if response is None:
