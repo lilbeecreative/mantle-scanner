@@ -485,7 +485,12 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
         if response is None:
             raise Exception("Gemini unavailable after 3 retries")
 
-        raw = response.text.strip()
+        # response.text can be None when Google Search tool is used
+        raw = response.text
+        if not raw:
+            parts = getattr(response.candidates[0].content, "parts", []) if response.candidates else []
+            raw = " ".join(p.text for p in parts if hasattr(p, "text") and p.text)
+        raw = (raw or "").strip()
         raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.IGNORECASE)
         raw = re.sub(r"\n?```$", "", raw).strip()
 
@@ -581,7 +586,12 @@ def process_legacy_photo(file_info):
             )
         )
 
-        raw = response.text.strip()
+        # response.text can be None when Google Search tool is used
+        raw = response.text
+        if not raw:
+            parts = getattr(response.candidates[0].content, "parts", []) if response.candidates else []
+            raw = " ".join(p.text for p in parts if hasattr(p, "text") and p.text)
+        raw = (raw or "").strip()
         raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.IGNORECASE)
         raw = re.sub(r"\n?```$", "", raw).strip()
 
