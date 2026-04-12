@@ -1432,6 +1432,7 @@ elif st.session_state.active_tab == "dashboard":
                                 price_updated = switch_condition(item_id, new_cond, t["price_used"], t["price_new"])
                                 if not price_updated:
                                     st.toast("Condition updated — update price manually", icon="⚠️")
+                                st.cache_data.clear()
                                 st.rerun()
 
                         matched_label = find_best_label(t["category"], t["cat_id"])
