@@ -839,13 +839,14 @@ if st.session_state.active_tab == "batch":
 
     def fix_rot_b(img_bytes):
         try:
+            from PIL import ImageOps
             img = Image.open(_io.BytesIO(img_bytes))
-            exif = img.getexif()
-            orientation = exif.get(274) if exif else None
-            if orientation:
-                rot = {3:180,6:270,8:90}.get(orientation)
-                if rot: img = img.rotate(rot, expand=True)
-            buf = _io.BytesIO(); img.save(buf, format="JPEG", quality=90); return buf.getvalue()
+            img = ImageOps.exif_transpose(img)
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            buf = _io.BytesIO()
+            img.save(buf, format="JPEG", quality=90)
+            return buf.getvalue()
         except Exception as _re:
             print(f"⚠️  Rotation fix failed: {_re}")
             return img_bytes
