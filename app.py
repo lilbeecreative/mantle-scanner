@@ -702,7 +702,7 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
             pic_url_str,           # All photos pipe-separated
             ebay_condition,
             EBAY_DESCRIPTION_CSV,  # Standard description on every listing
-            "BestOfferEnabled",    # Format
+            "FixedPrice",          # Format
         ])
     return output.getvalue().encode("utf-8")
 
