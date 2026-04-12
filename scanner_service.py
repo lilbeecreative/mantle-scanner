@@ -417,11 +417,23 @@ If you see a part number, include it.
 Even if the item is partially visible, describe what you can see.
 Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, black, corrupted)."""
 
-        id_resp = client.models.generate_content(
-            model=model,
-            contents=[*image_parts, id_prompt],
-            config=types.GenerateContentConfig(max_output_tokens=200)
-        )
+        id_resp = None
+        for _attempt in range(3):
+            try:
+                id_resp = client.models.generate_content(
+                    model=model,
+                    contents=[*image_parts, id_prompt],
+                    config=types.GenerateContentConfig(max_output_tokens=200)
+                )
+                break
+            except Exception as _e:
+                if "503" in str(_e) or "UNAVAILABLE" in str(_e):
+                    print(f"   ⏳ Gemini busy, retrying in 10s...")
+                    time.sleep(10)
+                else:
+                    raise
+        if id_resp is None:
+            raise Exception("Gemini unavailable after 3 retries")
         id_raw  = re.sub(r"^```[a-z]*\n?", "", (id_resp.text or "").strip(), flags=re.IGNORECASE)
         id_raw  = re.sub(r"\n?```$", "", id_raw).strip()
         json_match = re.search(r'\{[^{}]+\}', id_raw, re.DOTALL)
@@ -457,11 +469,23 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
         cfg = types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())]
         )
-        response = client.models.generate_content(
-            model=model,
-            contents=[*image_parts, prompt],
-            config=cfg
-        )
+        response = None
+        for _attempt in range(3):
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=[*image_parts, prompt],
+                    config=cfg
+                )
+                break
+            except Exception as _e:
+                if "503" in str(_e) or "UNAVAILABLE" in str(_e):
+                    print(f"   ⏳ Gemini busy, retrying in 10s (attempt {_attempt+1}/3)...")
+                    time.sleep(10)
+                else:
+                    raise
+        if response is None:
+            raise Exception("Gemini unavailable after 3 retries")
 
         raw = response.text.strip()
         raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.IGNORECASE)
