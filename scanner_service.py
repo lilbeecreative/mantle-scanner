@@ -488,13 +488,19 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
             raise Exception("Gemini unavailable after 3 retries")
 
         # response.text can be None when Google Search tool is used
-        raw = response.text
-        if not raw:
+        def extract_text(resp):
+            if resp is None: return ""
             try:
-                parts = getattr(response.candidates[0].content, "parts", []) if response.candidates else []
-                raw = " ".join(p.text for p in parts if hasattr(p, "text") and p.text)
-            except Exception:
-                raw = ""
+                if resp.text: return resp.text
+            except Exception: pass
+            try:
+                for cand in (resp.candidates or []):
+                    for part in (getattr(cand.content, "parts", None) or []):
+                        t = getattr(part, "text", None)
+                        if t: return t
+            except Exception: pass
+            return ""
+        raw = extract_text(response)
         raw = (raw or "").strip()
         raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.IGNORECASE)
         raw = re.sub(r"\n?```$", "", raw).strip()
@@ -615,13 +621,19 @@ def process_legacy_photo(file_info):
         )
 
         # response.text can be None when Google Search tool is used
-        raw = response.text
-        if not raw:
+        def extract_text(resp):
+            if resp is None: return ""
             try:
-                parts = getattr(response.candidates[0].content, "parts", []) if response.candidates else []
-                raw = " ".join(p.text for p in parts if hasattr(p, "text") and p.text)
-            except Exception:
-                raw = ""
+                if resp.text: return resp.text
+            except Exception: pass
+            try:
+                for cand in (resp.candidates or []):
+                    for part in (getattr(cand.content, "parts", None) or []):
+                        t = getattr(part, "text", None)
+                        if t: return t
+            except Exception: pass
+            return ""
+        raw = extract_text(response)
         raw = (raw or "").strip()
         raw = re.sub(r"^```[a-z]*\n?", "", raw, flags=re.IGNORECASE)
         raw = re.sub(r"\n?```$", "", raw).strip()
