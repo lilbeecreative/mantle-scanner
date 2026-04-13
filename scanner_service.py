@@ -509,6 +509,28 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
         price_new_high   = parse_num(data.get("price_new_high", 0))
         price_new        = parse_num(data.get("price_new", 0))
 
+        # ---- eBay Category Suggestion API ----
+        if title and title != "Unknown Item" and EBAY_APP_ID:
+            try:
+                cat_resp = requests.get(
+                    "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_suggestions",
+                    params={"q": title},
+                    headers={
+                        "Authorization": f"Bearer {EBAY_APP_ID}",
+                        "Content-Type": "application/json"
+                    },
+                    timeout=5
+                )
+                if cat_resp.status_code == 200:
+                    suggestions = cat_resp.json().get("categorySuggestions", [])
+                    if suggestions:
+                        best = suggestions[0]["category"]
+                        ebay_category_id = str(best.get("categoryId", ebay_category_id))
+                        ebay_category    = best.get("categoryName", ebay_category)
+                        print(f"   📂 eBay category: {ebay_category} (ID: {ebay_category_id})")
+            except Exception as _ce:
+                print(f"   ⚠️  Category lookup failed: {_ce}")
+
         if condition == "used":
             active_price = price_used if price_used > 0 else price_new
             active_low   = price_used_low if price_used_low > 0 else price_new_low
