@@ -305,11 +305,14 @@ Keep all part numbers from the identified title — do not remove them.
 
     return f"""You are an expert industrial parts eBay pricing specialist analyzing {photo_count} photo(s).
 {id_section}
-TASK 1 — CONFIRM OR REFINE IDENTIFICATION:
-- Use the pre-identified title above as your base
-- Search the web to verify brand and find the exact item
-- Only change the title if you find more specific/accurate information
-- Never remove part numbers that were already identified
+TASK 1 — RESEARCH THE PART NUMBER:
+- The pre-identified title is your starting point: "{id_title}"
+- If it contains ANY part number or model number, search for it IMMEDIATELY
+- Search: "[brand] [part number]" on Google and eBay to find the exact item name
+- Example: "CAT 17C0033" → search → find it is a "Caterpillar 17C0033 Seal Kit" or similar
+- The part number is more important than any visual description
+- Replace vague titles like "Empty Bag" or "Industrial Part" with the real item name found via search
+- Never keep a generic title if a part number exists that you can research
 
 TASK 2 — PRICING RESEARCH:
 {ebay_section}
@@ -465,7 +468,7 @@ CRITICAL RULES:
                     contents=[*image_parts, id_prompt],
                     config=types.GenerateContentConfig(
                         temperature=0.0,
-                        system_instruction="You are an expert industrial parts identifier. You are highly literal. You never infer, guess, or assume brands or part numbers. You only extract what is physically written on the item.",
+                        system_instruction="You are an expert industrial parts identifier specializing in reading part numbers, model numbers, and brand names from photos. Your PRIMARY job is to find any alphanumeric codes on the item and transcribe them exactly. Part numbers are the most valuable piece of information — they unlock everything else. Even partial numbers are valuable. Read every character carefully.",
                         response_mime_type="application/json",
                         response_schema=PartIdentification,
                     )
