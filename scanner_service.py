@@ -470,13 +470,27 @@ CRITICAL RULES:
                     raise
         if id_resp is None:
             raise Exception("Gemini unavailable after 3 retries")
-        id_raw  = re.sub(r"^```[a-z]*\n?", "", (id_resp.text or "").strip(), flags=re.IGNORECASE)
+        def extract_gemini_text(resp):
+            if not resp: return ""
+            try:
+                if resp.text: return resp.text
+            except Exception: pass
+            try:
+                for cand in (resp.candidates or []):
+                    for part in (getattr(cand.content, "parts", None) or []):
+                        t = getattr(part, "text", None)
+                        if t: return t
+            except Exception: pass
+            return ""
+        id_raw_text = extract_gemini_text(id_resp)
+        id_raw  = re.sub(r"^```[a-z]*\n?", "", id_raw_text.strip(), flags=re.IGNORECASE)
         id_raw  = re.sub(r"\n?```$", "", id_raw).strip()
-        json_match = re.search(r'\{[^{}]+\}', id_raw, re.DOTALL)
+        json_match = re.search(r'\{[\s\S]+\}', id_raw, re.DOTALL)
         if json_match:
             id_raw = json_match.group()
-        parsed_title = str(json.loads(id_raw).get("title", "")).strip()
-        text_found   = str(json.loads(id_raw).get("text_found", "")).strip()
+        parsed_data  = json.loads(id_raw) if id_raw else {}
+        parsed_title = str(parsed_data.get("title", "")).strip()
+        text_found   = str(parsed_data.get("text_found", "")).strip()
         if parsed_title and parsed_title.lower() not in ("unknown item", "unknown", ""):
             title_for_ebay = parsed_title
         elif text_found:
