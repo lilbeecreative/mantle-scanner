@@ -435,7 +435,14 @@ def process_group(group: dict):
 CRITICAL RULES:
 1. READ FIRST: Transcribe all visible text, numbers, and codes exactly as they appear. Look closely at stamped metal, worn labels, cast markings.
 2. NO GUESSING: Never assume a manufacturer based on color, shape, or style. If it is not written on the part, it is UNBRANDED.
-3. CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_part_number, then physical_description, then generated_title."""
+3. INTERPRET CORRECTLY: Common stampings on industrial parts have specific meanings:
+   - "CAP XX TONS" or "CAP XX LBS" = capacity rating, NOT a brand name
+   - "WLL XX" = working load limit, NOT a brand
+   - "SWL XX" = safe working load, NOT a brand
+   - "MAX XX LBS" = maximum load, NOT a brand
+   - Numbers alone (e.g. "15000") = weight/load rating in lbs
+   Include these as specs in the title, not as brand names.
+4. CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_part_number, then physical_description, then generated_title."""
 
         id_model = "models/gemini-2.5-pro"
         id_resp = None
