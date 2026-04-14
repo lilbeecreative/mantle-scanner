@@ -298,9 +298,13 @@ Search for both USED and NEW condition prices separately and report all prices f
 """
 
     id_section = f"""
-The item has already been identified as: "{id_title}"
-Use this as your starting point. Refine the title if your web search reveals a more specific brand or model.
-Keep all part numbers from the identified title — do not remove them.
+IDENTIFIED INFO: "{id_title}"
+
+CRITICAL FIRST STEP: If the title contains a part number, search for it NOW before doing anything else.
+- Search Google: "[brand] [part number] site:ebay.com" to find the real item name
+- "Caterpillar 17C0033 Empty Bag" means part number is 17C0033 — search "CAT 17C0033" to find it is actually a specific seal, gasket, or component
+- NEVER use words like "Empty Bag", "Packaging", "Label", "Sticker", or "Memorabilia" in the title
+- The part number reveals the real item — always research it
 """ if id_title else ""
 
     return f"""You are an expert industrial parts eBay pricing specialist analyzing {photo_count} photo(s).
