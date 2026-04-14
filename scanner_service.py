@@ -296,34 +296,47 @@ Use your Google Search tool to find current eBay pricing for this item. Search f
 Search for both USED and NEW condition prices separately and report all prices found.
 """
 
-    return f"""You are a JSON-only resale pricing expert analyzing {photo_count} photo(s) of the same item.
+    return f"""You are an expert industrial parts identifier and eBay resale pricing specialist analyzing {photo_count} photo(s) of the same item.
 
-Step 1 — Identify the item precisely. Read every visible brand name, model number, part number, and spec.
+You have deep knowledge of: industrial automation, hydraulics, pneumatics, heavy equipment parts, commercial truck parts, electrical components, bearings, seals, filters, valves, sensors, PLCs, motors, pumps, and all types of industrial hardware.
 
-Step 2 — Use the pricing data below to determine accurate market values.
+TASK 1 — IDENTIFY WITH MAXIMUM PRECISION:
+- Read every brand name, part number, model number, serial number, spec marking visible
+- Use your expert knowledge to identify the exact item type and application
+- Cross-reference any part numbers you see with your knowledge base
+- The title MUST include brand + part number if visible, or a precise descriptive title if not
+
+TASK 2 — PRICING RESEARCH:
 {ebay_section}
-The item was marked as condition: {condition} by the employee scanning it.
+The employee marked this item as: {condition}
+
+TASK 3 — SELF-VERIFY:
+Before returning, ask yourself:
+- Is my title specific enough? (Should include brand + part# whenever visible)
+- Did I include the most important keywords a buyer would search for?
+- Are my prices based on actual sold data, not guesses?
 
 Return ONLY a raw JSON object, no markdown, no backticks:
 
 {{
-  "title": "eBay listing title under 80 characters, specific and keyword-rich with brand and model",
-  "ebay_category": "full eBay category path",
-  "ebay_category_id": "numeric eBay category ID only",
-  "weight_oz": "estimated weight in ounces as number only",
-  "weight_lb": "estimated weight in pounds as number only",
-  "price_used_low": lowest USED price found as number only — 0 if none,
-  "price_used_high": highest USED price found as number only — 0 if none,
-  "price_used": recommended listing price for USED condition as number only — 0 if none,
-  "price_new_low": lowest NEW price found as number only — 0 if none,
-  "price_new_high": highest NEW price found as number only — 0 if none,
-  "price_new": recommended listing price for NEW condition as number only — 0 if none
+  "title": "Brand PartNumber ItemType KeySpec — keyword-rich eBay title under 80 chars",
+  "ebay_category": "full eBay category path e.g. eBay Motors > Parts & Accessories > ...",
+  "ebay_category_id": numeric eBay category ID as number,
+  "weight_oz": estimated weight in ounces as number,
+  "weight_lb": estimated weight in pounds as number,
+  "price_used_low": lowest used price found as number — 0 if none,
+  "price_used_high": highest used price found as number — 0 if none,
+  "price_used": recommended used listing price as number — 0 if none,
+  "price_new_low": lowest new price found as number — 0 if none,
+  "price_new_high": highest new price found as number — 0 if none,
+  "price_new": recommended new listing price as number — 0 if none
 }}
 
-Be as specific as possible with the title — include brand, model number, part number, size, and specs.
-Look carefully at ALL visible text, labels, and markings in the photos.
-Only use "Unknown Item" if the image is completely unidentifiable (blank, black, or corrupted).
-Even a partial identification is better than "Unknown Item" — describe what you can see."""
+ABSOLUTE RULES:
+- NEVER return "Unknown Item" — always provide your best identification
+- If no text is visible, describe by type: material, shape, size, application, industry
+- If part number is visible, it MUST appear in the title
+- A precise description beats a vague one every time"""
 
 # ------------------------------------------------------------------ #
 #  PROCESS A GROUP
@@ -404,18 +417,31 @@ def process_group(group: dict):
     print(f"   🔍 Step 1: Identifying item from photos...")
     title_for_ebay = "Unknown Item"
     try:
-        id_prompt = """Examine every visible detail in this photo carefully.
-Read ALL text, labels, brand names, model numbers, part numbers, serial numbers, and specifications.
-Look at shape, size, color, connectors, markings — everything.
+        id_prompt = """You are an expert in industrial, commercial, and heavy equipment parts with 20 years of experience identifying parts for eBay resale.
 
-Return ONLY a raw JSON object, no markdown, no backticks:
-{"title": "Brand Model PartNumber Specs — concise eBay-style title under 60 chars"}
+Analyze this photo carefully. Your job is to read every piece of text and identify this part as specifically as possible.
 
-Be as specific as possible. If you see a brand name, include it.
-If you see a model number, include it.
-If you see a part number, include it.
-Even if the item is partially visible, describe what you can see.
-Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, black, corrupted)."""
+STEP 1 - READ ALL TEXT:
+Scan every inch of the image for: brand names, manufacturer names, part numbers, model numbers, catalog numbers, serial numbers, voltage/amperage ratings, size markings, material codes, revision letters, date codes, and any alphanumeric sequences.
+
+STEP 2 - IDENTIFY THE PART:
+Use your industrial parts expertise to identify what this is. Consider: the shape, connectors, mounting points, color, size, and any visible text.
+
+STEP 3 - BUILD AN EBAY TITLE:
+Format: [Brand] [Part/Model Number] [Item Type] [Key Specs]
+Examples of good titles:
+- "Allen-Bradley 1756-OF4 SER A ControlLogix Analog Output Module"
+- "Meritor A75-3275S1059 Air Brake Automatic Slack Adjuster 1.5in 28 Spline"
+- "Donaldson P182050 Primary Air Filter 4.09in OD x 10in L"
+
+Return ONLY raw JSON, no markdown, no backticks:
+{"title": "specific title with brand and part number under 80 chars", "text_found": "all text you could read from the image"}
+
+CRITICAL RULES:
+- NEVER return Unknown Item — if you cannot read any text, describe the part by type/shape/application
+- A specific description like "Heavy Duty Forged Steel Pintle Hitch Lunette Ring 3in ID" is acceptable if no part number is visible
+- Always include brand if visible
+- Always include part/model number if visible"""
 
         id_resp = None
         for _attempt in range(3):
@@ -440,9 +466,14 @@ Only use "Unknown Item" if the image is completely unidentifiable (e.g. blank, b
         if json_match:
             id_raw = json_match.group()
         parsed_title = str(json.loads(id_raw).get("title", "")).strip()
+        text_found   = str(json.loads(id_raw).get("text_found", "")).strip()
         if parsed_title and parsed_title.lower() not in ("unknown item", "unknown", ""):
             title_for_ebay = parsed_title
+        elif text_found:
+            title_for_ebay = text_found[:80]
         print(f"   🏷️  Identified: {title_for_ebay}")
+        if text_found:
+            print(f"   📝 Text found: {text_found[:100]}")
     except Exception as e:
         print(f"   ⚠️  ID pass failed: {e}")
 
