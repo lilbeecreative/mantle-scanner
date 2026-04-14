@@ -438,10 +438,11 @@ Return ONLY raw JSON, no markdown, no backticks:
 {"title": "specific title with brand and part number under 80 chars", "text_found": "all text you could read from the image"}
 
 CRITICAL RULES:
-- NEVER return Unknown Item — if you cannot read any text, describe the part by type/shape/application
-- A specific description like "Heavy Duty Forged Steel Pintle Hitch Lunette Ring 3in ID" is acceptable if no part number is visible
-- Always include brand if visible
-- Always include part/model number if visible"""
+- NEVER state a brand or manufacturer unless it is EXPLICITLY printed, stamped, cast, or labeled on the part — do NOT guess based on appearance or part style
+- If you see numbers that might be a part number but are hard to read, include your best reading e.g. "115-55?2"
+- NEVER return Unknown Item — if no text is readable, describe by type, size, material, application
+- A title like "Heavy Duty Forged Steel Drawbar Tow Eye Pintle Hook" is correct when no brand is visible
+- Only put a brand in the title if you can actually read it on the part itself"""
 
         id_resp = None
         for _attempt in range(3):
