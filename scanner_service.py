@@ -352,7 +352,7 @@ class PartIdentification(BaseModel):
     verified_brand: str = Field(description="Brand ONLY if explicitly written in raw_text_read. Otherwise write UNBRANDED.")
     verified_part_number: str = Field(description="Exact part number ONLY if found in raw_text_read. Otherwise write UNKNOWN.")
     physical_description: str = Field(description="Physical description: material, shape, size, application.")
-    generated_title: str = Field(description="Final eBay title under 80 chars using verified fields only. Never guess brand.")
+    generated_title: str = Field(description="Final eBay title, maximum 80 characters. Must end at a complete word — never cut off mid-word. Priority: brand + part number + item type + key specs. Drop least important words to stay under 80 chars cleanly.")
 
 
 def process_group(group: dict):
