@@ -347,6 +347,13 @@ ABSOLUTE RULES:
 #  PROCESS A GROUP
 # ------------------------------------------------------------------ #
 
+def truncate_title(t: str, limit: int = 80) -> str:
+    t = t.title()
+    if len(t) <= limit:
+        return t
+    return t[:limit].rsplit(" ", 1)[0].rstrip(",.;:-")
+
+
 class PartIdentification(BaseModel):
     raw_text_read: str = Field(description="Strict transcription of ALL letters, numbers, codes visible on the part. If none visible, write NONE.")
     verified_brand: str = Field(description="Brand ONLY if explicitly written in raw_text_read. Otherwise write UNBRANDED.")
@@ -595,13 +602,6 @@ CRITICAL RULES:
     except Exception as e:
         print(f"   ⚠️  Gemini error: {e}")
         title, ebay_category, price_note = "Unknown Item", "", ""
-
-def truncate_title(t: str, limit: int = 80) -> str:
-    t = t.title()
-    if len(t) <= limit:
-        return t
-    truncated = t[:limit].rsplit(" ", 1)[0]
-    return truncated.rstrip(",.;:-")
         ebay_category_id = "0"
         weight_oz = weight_lb = 0.00
         price_used = price_used_low = price_used_high = 0.00
