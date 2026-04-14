@@ -413,92 +413,55 @@ def process_group(group: dict):
         supabase.table("listing_groups").update({"status": "error"}).eq("id", group_id).execute()
         return
 
-    # ---- STEP 1: Quick ID pass to get title for eBay lookup ----
-    print(f"   🔍 Step 1: Identifying item from photos...")
-    title_for_ebay = "Unknown Item"
+    # ---- STEP 1: Structured ID pass using Pydantic schema ----
+    print(f"   \U0001f50d Step 1: Identifying item from photos...")
+    title_for_ebay = ""
     try:
-        id_prompt = """You are an expert in industrial, commercial, and heavy equipment parts with 20 years of experience identifying parts for eBay resale.
-
-Analyze this photo carefully. Your job is to read every piece of text and identify this part as specifically as possible.
-
-STEP 1 - READ ALL TEXT:
-Scan every inch of the image for: brand names, manufacturer names, part numbers, model numbers, catalog numbers, serial numbers, voltage/amperage ratings, size markings, material codes, revision letters, date codes, and any alphanumeric sequences.
-
-STEP 2 - IDENTIFY THE PART:
-Use your industrial parts expertise to identify what this is. Consider: the shape, connectors, mounting points, color, size, and any visible text.
-
-STEP 3 - BUILD AN EBAY TITLE:
-Format: [Brand] [Part/Model Number] [Item Type] [Key Specs]
-Examples of good titles:
-- "Allen-Bradley 1756-OF4 SER A ControlLogix Analog Output Module"
-- "Meritor A75-3275S1059 Air Brake Automatic Slack Adjuster 1.5in 28 Spline"
-- "Donaldson P182050 Primary Air Filter 4.09in OD x 10in L"
-
-Return ONLY raw JSON, no markdown, no backticks:
-{"title": "specific title with brand and part number under 80 chars", "text_found": "all text you could read from the image"}
+        id_prompt = """Analyze this photo of an industrial part for eBay resale.
 
 CRITICAL RULES:
-- NEVER state a brand or manufacturer unless it is EXPLICITLY printed, stamped, cast, or labeled on the part — do NOT guess based on appearance or part style
-- If you see numbers that might be a part number but are hard to read, include your best reading e.g. "115-55?2"
-- NEVER return Unknown Item — if no text is readable, describe by type, size, material, application
-- A title like "Heavy Duty Forged Steel Drawbar Tow Eye Pintle Hook" is correct when no brand is visible
-- Only put a brand in the title if you can actually read it on the part itself"""
+1. READ FIRST: Transcribe all visible text, numbers, and codes exactly as they appear. Look closely at stamped metal, worn labels, cast markings.
+2. NO GUESSING: Never assume a manufacturer based on color, shape, or style. If it is not written on the part, it is UNBRANDED.
+3. CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_part_number, then physical_description, then generated_title."""
 
-        id_resp = None
         id_model = "models/gemini-2.5-pro"
+        id_resp = None
         for _attempt in range(3):
             try:
                 id_resp = client.models.generate_content(
                     model=id_model,
                     contents=[*image_parts, id_prompt],
                     config=types.GenerateContentConfig(
-                        max_output_tokens=500,
                         temperature=0.0,
-                        system_instruction="You are an expert industrial parts identifier with 20 years experience in heavy equipment, automation, hydraulics, and commercial truck parts. You specialize in reading part numbers from photos and identifying components for eBay resale. You are precise, literal, and never guess — you only state what you can directly observe."
+                        system_instruction="You are an expert industrial parts identifier. You are highly literal. You never infer, guess, or assume brands or part numbers. You only extract what is physically written on the item.",
+                        response_mime_type="application/json",
+                        response_schema=PartIdentification,
                     )
                 )
                 break
             except Exception as _e:
                 err = str(_e)
-                if "503" in err or "UNAVAILABLE" in err:
-                    print(f"   ⏳ Gemini Pro busy, retrying in 15s...")
+                if "503" in err or "UNAVAILABLE" in err or "429" in err:
+                    print(f"   \u23f3 Gemini Pro busy, retrying in 15s...")
                     time.sleep(15)
                 elif "404" in err or "deprecated" in err.lower():
                     id_model = model
-                    print(f"   ⚠️  Pro unavailable, falling back to {model}")
+                    print(f"   \u26a0\ufe0f  Pro unavailable, falling back to {model}")
                 else:
                     raise
         if id_resp is None:
             raise Exception("Gemini unavailable after 3 retries")
-        def extract_gemini_text(resp):
-            if not resp: return ""
-            try:
-                if resp.text: return resp.text
-            except Exception: pass
-            try:
-                for cand in (resp.candidates or []):
-                    for part in (getattr(cand.content, "parts", None) or []):
-                        t = getattr(part, "text", None)
-                        if t: return t
-            except Exception: pass
-            return ""
-        id_raw_text = extract_gemini_text(id_resp)
-        id_raw  = re.sub(r"^```[a-z]*\n?", "", id_raw_text.strip(), flags=re.IGNORECASE)
-        id_raw  = re.sub(r"\n?```$", "", id_raw).strip()
-        json_match = re.search(r'\{[\s\S]+\}', id_raw, re.DOTALL)
-        if json_match:
-            id_raw = json_match.group()
-        parsed_data  = json.loads(id_raw) if id_raw else {}
-        parsed_title = str(parsed_data.get("title", "")).strip()
-        text_found   = str(parsed_data.get("text_found", "")).strip()
-        if parsed_title and parsed_title.lower() not in ("unknown item", "unknown", ""):
-            title_for_ebay = parsed_title
-        elif text_found:
-            title_for_ebay = text_found[:80]
-        print(f"   🏷️  Identified: {title_for_ebay}")
-        if text_found:
-            print(f"   📝 Text found: {text_found[:100]}")
+        parsed_data    = json.loads(id_resp.text)
+        title_for_ebay = parsed_data.get("generated_title", "").strip()
+        text_found     = parsed_data.get("raw_text_read", "").strip()
+        print(f"   \U0001f4dd Text found:   {text_found[:100]}")
+        print(f"   \U0001f3f7\ufe0f  Brand:        {parsed_data.get('verified_brand')}")
+        print(f"   \U0001f522 Part number:  {parsed_data.get('verified_part_number')}")
+        print(f"   \u2705 Title:        {title_for_ebay}")
     except Exception as e:
+        print(f"   \u26a0\ufe0f  ID pass failed: {e}")
+    if not title_for_ebay:
+        title_for_ebay = "Industrial Part"
         print(f"   ⚠️  ID pass failed: {e}")
 
     # ---- STEP 2: Fetch real eBay prices (sold + active) ----
