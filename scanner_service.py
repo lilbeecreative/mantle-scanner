@@ -445,18 +445,23 @@ CRITICAL RULES:
 - Only put a brand in the title if you can actually read it on the part itself"""
 
         id_resp = None
+        id_model = "models/gemini-2.5-pro"
         for _attempt in range(3):
             try:
                 id_resp = client.models.generate_content(
-                    model=model,
+                    model=id_model,
                     contents=[*image_parts, id_prompt],
-                    config=types.GenerateContentConfig(max_output_tokens=200)
+                    config=types.GenerateContentConfig(max_output_tokens=500)
                 )
                 break
             except Exception as _e:
-                if "503" in str(_e) or "UNAVAILABLE" in str(_e):
-                    print(f"   ⏳ Gemini busy, retrying in 10s...")
-                    time.sleep(10)
+                err = str(_e)
+                if "503" in err or "UNAVAILABLE" in err:
+                    print(f"   ⏳ Gemini Pro busy, retrying in 15s...")
+                    time.sleep(15)
+                elif "404" in err or "deprecated" in err.lower():
+                    id_model = model
+                    print(f"   ⚠️  Pro unavailable, falling back to {model}")
                 else:
                     raise
         if id_resp is None:
