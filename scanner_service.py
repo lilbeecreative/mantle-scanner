@@ -451,7 +451,11 @@ CRITICAL RULES:
                 id_resp = client.models.generate_content(
                     model=id_model,
                     contents=[*image_parts, id_prompt],
-                    config=types.GenerateContentConfig(max_output_tokens=500)
+                    config=types.GenerateContentConfig(
+                        max_output_tokens=500,
+                        temperature=0.0,
+                        system_instruction="You are an expert industrial parts identifier with 20 years experience in heavy equipment, automation, hydraulics, and commercial truck parts. You specialize in reading part numbers from photos and identifying components for eBay resale. You are precise, literal, and never guess — you only state what you can directly observe."
+                    )
                 )
                 break
             except Exception as _e:
@@ -504,7 +508,9 @@ CRITICAL RULES:
 
     try:
         cfg = types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())]
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            temperature=0.1,
+            system_instruction="You are an expert industrial parts resale pricing specialist. You identify parts precisely from photos, search eBay for real sold prices, and return accurate structured data. Never guess manufacturer names — only state brands you can read on the part."
         )
         response = None
         for _attempt in range(3):
