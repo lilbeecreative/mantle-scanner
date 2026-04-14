@@ -442,6 +442,11 @@ def process_group(group: dict):
 CRITICAL RULES:
 1. READ FIRST: Transcribe all visible text, numbers, and codes exactly as they appear. Look closely at stamped metal, worn labels, cast markings.
 2. NO GUESSING: Never assume a manufacturer based on color, shape, or style. If it is not written on the part, it is UNBRANDED.
+   EXCEPTION: If you can clearly read a brand name on a label, sticker, or packaging, that IS the brand.
+3. PACKAGING vs PART: If the item appears to be in a bag, box, or has a label — identify the PART INSIDE, not the packaging or label itself.
+   - A yellow CAT bag with part number 17C0033 = a Caterpillar part #17C0033, not a "sticker"
+   - A box with "Donaldson P182050" = a Donaldson filter, not a "box"
+   - Always identify what the part IS, not what it comes in
 3. INTERPRET CORRECTLY: Common stampings on industrial parts have specific meanings:
    - "CAP XX TONS" means capacity is XX tons e.g. "CAP 10 TONS" = 10 Ton Capacity, NOT a brand called CAP and NOT 10,500 lbs
    - "WLL XX" = working load limit, NOT a brand
