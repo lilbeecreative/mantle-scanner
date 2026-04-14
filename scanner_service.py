@@ -277,7 +277,7 @@ def fetch_ebay_prices(title: str) -> dict:
 #  GEMINI PROMPT
 # ------------------------------------------------------------------ #
 
-def make_prompt(photo_count: int, condition: str = "used", ebay_data: dict = None) -> str:
+def make_prompt(photo_count: int, condition: str = "used", ebay_data: dict = None, id_title: str = "") -> str:
     ebay_section = ""
     if ebay_data and ebay_data.get("has_data"):
         ebay_section = f"""
@@ -297,25 +297,30 @@ Use your Google Search tool to find current eBay pricing for this item. Search f
 Search for both USED and NEW condition prices separately and report all prices found.
 """
 
-    return f"""You are an expert industrial parts identifier and eBay resale pricing specialist analyzing {photo_count} photo(s) of the same item.
+    id_section = f"""
+The item has already been identified as: "{id_title}"
+Use this as your starting point. Refine the title if your web search reveals a more specific brand or model.
+Keep all part numbers from the identified title — do not remove them.
+""" if id_title else ""
 
-You have deep knowledge of: industrial automation, hydraulics, pneumatics, heavy equipment parts, commercial truck parts, electrical components, bearings, seals, filters, valves, sensors, PLCs, motors, pumps, and all types of industrial hardware.
-
-TASK 1 — IDENTIFY WITH MAXIMUM PRECISION:
-- Read every brand name, part number, model number, serial number, spec marking visible
-- Use your expert knowledge to identify the exact item type and application
-- Cross-reference any part numbers you see with your knowledge base
-- The title MUST include brand + part number if visible, or a precise descriptive title if not
+    return f"""You are an expert industrial parts eBay pricing specialist analyzing {photo_count} photo(s).
+{id_section}
+TASK 1 — CONFIRM OR REFINE IDENTIFICATION:
+- Use the pre-identified title above as your base
+- Search the web to verify brand and find the exact item
+- Only change the title if you find more specific/accurate information
+- Never remove part numbers that were already identified
 
 TASK 2 — PRICING RESEARCH:
 {ebay_section}
 The employee marked this item as: {condition}
 
-TASK 3 — SELF-VERIFY:
-Before returning, ask yourself:
-- Is my title specific enough? (Should include brand + part# whenever visible)
-- Did I include the most important keywords a buyer would search for?
-- Are my prices based on actual sold data, not guesses?
+TASK 3 — SELECT THE CORRECT EBAY CATEGORY:
+- Think carefully about what this item actually is before selecting a category
+- A trailer hitch goes in eBay Motors > Towing, NOT Sporting Goods
+- An industrial valve goes in Business & Industrial, NOT Home & Garden
+- Use your knowledge of the item type to pick the most specific accurate category
+- Search eBay to verify the category if unsure
 
 Return ONLY a raw JSON object, no markdown, no backticks:
 
@@ -334,10 +339,9 @@ Return ONLY a raw JSON object, no markdown, no backticks:
 }}
 
 ABSOLUTE RULES:
-- NEVER return "Unknown Item" — always provide your best identification
-- If no text is visible, describe by type: material, shape, size, application, industry
-- If part number is visible, it MUST appear in the title
-- A precise description beats a vague one every time"""
+- NEVER return Unknown Item
+- Keep all part numbers from the pre-identified title
+- Category must match the actual item type — double check before returning"""
 
 # ------------------------------------------------------------------ #
 #  PROCESS A GROUP
@@ -486,7 +490,7 @@ CRITICAL RULES:
             print(f"   ⚠️  eBay API unavailable — Gemini will search eBay + web directly")
 
     # ---- STEP 3: Full Gemini pass with real eBay data injected ----
-    prompt = make_prompt(len(image_parts), condition, ebay_data)
+    prompt = make_prompt(len(image_parts), condition, ebay_data, id_title=title_for_ebay)
     # Always use Google Search — it finds eBay sold listings, Amazon, and other
     # marketplaces regardless of whether the eBay API succeeded or failed
     use_search = True
