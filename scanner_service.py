@@ -1,6 +1,7 @@
 import os
 import re
 import time
+from pydantic import BaseModel, Field
 import json
 import io
 from datetime import datetime
@@ -341,6 +342,14 @@ ABSOLUTE RULES:
 # ------------------------------------------------------------------ #
 #  PROCESS A GROUP
 # ------------------------------------------------------------------ #
+
+class PartIdentification(BaseModel):
+    raw_text_read: str = Field(description="Strict transcription of ALL letters, numbers, codes visible on the part. If none visible, write NONE.")
+    verified_brand: str = Field(description="Brand ONLY if explicitly written in raw_text_read. Otherwise write UNBRANDED.")
+    verified_part_number: str = Field(description="Exact part number ONLY if found in raw_text_read. Otherwise write UNKNOWN.")
+    physical_description: str = Field(description="Physical description: material, shape, size, application.")
+    generated_title: str = Field(description="Final eBay title under 80 chars using verified fields only. Never guess brand.")
+
 
 def process_group(group: dict):
     group_id  = group["id"]
