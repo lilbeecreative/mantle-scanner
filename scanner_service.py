@@ -436,7 +436,7 @@ CRITICAL RULES:
 1. READ FIRST: Transcribe all visible text, numbers, and codes exactly as they appear. Look closely at stamped metal, worn labels, cast markings.
 2. NO GUESSING: Never assume a manufacturer based on color, shape, or style. If it is not written on the part, it is UNBRANDED.
 3. INTERPRET CORRECTLY: Common stampings on industrial parts have specific meanings:
-   - "CAP XX TONS" or "CAP XX LBS" = capacity rating, NOT a brand name
+   - "CAP XX TONS" means capacity is XX tons e.g. "CAP 10 TONS" = 10 Ton Capacity, NOT a brand called CAP and NOT 10,500 lbs
    - "WLL XX" = working load limit, NOT a brand
    - "SWL XX" = safe working load, NOT a brand
    - "MAX XX LBS" = maximum load, NOT a brand
@@ -597,6 +597,7 @@ CRITICAL RULES:
         title, ebay_category, price_note = "Unknown Item", "", ""
 
 def truncate_title(t: str, limit: int = 80) -> str:
+    t = t.title()
     if len(t) <= limit:
         return t
     truncated = t[:limit].rsplit(" ", 1)[0]
