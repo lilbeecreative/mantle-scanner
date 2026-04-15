@@ -659,32 +659,16 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
             ebay_condition = "3000"
 
         # Fetch ALL photos for this listing group
+        main_photo = str(row.get("photo_id", ""))
         pic_urls = []
         try:
-            group_result = supabase.table("listing_groups").select("id").eq("session_id", str(row.get("photo_id",""))).execute()
-            # Try to get photos via group_photos table using listing id
-            photos_result = supabase.table("group_photos").select("photo_id").limit(10).execute()
-            # Fallback: just use the single photo_id
+            gp = supabase.table("group_photos").select("group_id").eq("photo_id", main_photo).execute()
+            if gp.data and gp.data[0].get("group_id"):
+                group_id = gp.data[0]["group_id"]
+                all_photos = supabase.table("group_photos").select("photo_id").eq("group_id", group_id).execute()
+                pic_urls = [photo_url(p["photo_id"]) for p in (all_photos.data or []) if p.get("photo_id")]
         except Exception:
             pass
-
-        # Primary approach: get group photos linked to this item
-        main_photo = str(row.get("photo_id", ""))
-        try:
-            # Find the listing_group that produced this listing by matching session pattern
-            gp = supabase.table("group_photos").select("photo_id").eq("photo_id", main_photo).execute()
-            if gp.data:
-                group_id = None
-                # Get group_id from group_photos
-                gp2 = supabase.table("group_photos").select("group_id, photo_id").eq("photo_id", main_photo).execute()
-                if gp2.data:
-                    group_id = gp2.data[0]["group_id"]
-                if group_id:
-                    all_photos = supabase.table("group_photos").select("photo_id").eq("group_id", group_id).execute()
-                    pic_urls = [photo_url(p["photo_id"]) for p in (all_photos.data or []) if p.get("photo_id")]
-        except Exception:
-            pass
-
         if not pic_urls and main_photo:
             pic_urls = [photo_url(main_photo)]
 
@@ -974,6 +958,12 @@ if st.session_state.active_tab == "batch":
 
             # File uploader — this is the MAIN action, always visible
             st.markdown("<div style='color:#64748b;font-size:0.72rem;margin-bottom:4px;'>📐 Tip: shoot in landscape (horizontal) for best results</div>", unsafe_allow_html=True)
+            cam_col, up_col = st.columns([1,1])
+            with cam_col:
+                camera_photo = st.camera_input("📷 Take photo", key=f"cam_{st.session_state.file_group_id}", label_visibility="collapsed")
+            with up_col:
+                st.markdown("<div style='font-size:0.75rem;color:#64748b;margin-bottom:4px;'>Or upload from gallery</div>", unsafe_allow_html=True)
+
             uploaded_files = st.file_uploader(
                 "Tap to take photo or select from library",
                 type=["jpg","jpeg","png","heic"],
@@ -981,6 +971,8 @@ if st.session_state.active_tab == "batch":
                 key=f"fup_{st.session_state.file_group_id}",
                 label_visibility="collapsed"
             )
+            if camera_photo and camera_photo not in (uploaded_files or []):
+                uploaded_files = list(uploaded_files or []) + [camera_photo]
             if uploaded_files and len(uploaded_files) > 10:
                 st.warning("Max 10 photos — using first 10.")
                 uploaded_files = uploaded_files[:10]
