@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Lister AI — Scan</title>
+<style>
+:root {
+  --green: #27500A;
+  --green-mid: #3B6D11;
+  --green-light: #C0DD97;
+  --green-bg: #EAF3DE;
+  --blue-dark: #0C447C;
+  --blue-mid: #185FA5;
+  --blue-light: #B5D4F4;
+  --blue-bg: #E6F1FB;
+  --surface: #F5F4F0;
+  --card: #FFFFFF;
+  --border: rgba(0,0,0,0.1);
+  --text: #1a1a1a;
+  --text-2: #555;
+  --text-3: #999;
+  --red: #dc2626;
+  --red-bg: #FEF2F2;
+  --amber-bg: #FFFBEB;
+  --amber: #92400E;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--surface);
+  color: var(--text);
+  min-height: 100vh;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── topbar ── */
+.topbar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 10px;
+  position: sticky; top: 0; z-index: 10;
+}
+.logo-mark {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--green);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.logo-mark svg { width: 15px; height: 15px; color: var(--green-light); }
+.logo-text { font-size: 16px; font-weight: 600; color: var(--text); }
+.logo-sub { font-size: 11px; color: var(--text-3); margin-left: 4px; }
+.spacer { flex: 1; }
+.batch-pill {
+  font-size: 11px; padding: 4px 10px; border-radius: 20px;
+  background: var(--green-bg); color: var(--green);
+  font-weight: 500; display: none;
+}
+
+/* ── main ── */
+.main { padding: 16px; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+/* ── stat row ── */
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; }
+.stat-n { font-size: 22px; font-weight: 600; color: var(--text); }
+.stat-l { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+/* ── condition ── */
+.cond-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cond-btn {
+  border-radius: 12px; padding: 14px; display: flex; align-items: center; gap: 12px;
+  border: 2px solid transparent; cursor: pointer; transition: all 0.15s; background: var(--card);
+}
+.cond-btn.used { background: var(--blue-bg); }
+.cond-btn.used.active { border-color: var(--blue-mid); }
+.cond-btn.new { background: var(--green-bg); }
+.cond-btn.new.active { border-color: var(--green-mid); }
+.cond-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.ci-used { background: var(--blue-light); } .ci-used svg { color: var(--blue-dark); }
+.ci-new  { background: var(--green-light); } .ci-new svg { color: var(--green); }
+.cond-icon svg { width: 16px; height: 16px; }
+.cond-label { font-size: 14px; font-weight: 600; }
+.used .cond-label { color: var(--blue-dark); }
+.new  .cond-label { color: var(--green); }
+.cond-sub { font-size: 11px; margin-top: 1px; }
+.used .cond-sub { color: var(--blue-mid); }
+.new  .cond-sub { color: var(--green-mid); }
+.check-ring {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 2px solid; margin-left: auto; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+}
+.used .check-ring { border-color: var(--blue-mid); }
+.used.active .check-ring { background: var(--blue-mid); }
+.new  .check-ring { border-color: var(--green-mid); }
+.new.active  .check-ring { background: var(--green-mid); }
+.check-ring svg { width: 10px; height: 10px; color: white; display: none; }
+.active .check-ring svg { display: block; }
+
+/* ── start btn ── */
+.btn-green {
+  background: var(--green); color: var(--green-light);
+  border: none; border-radius: 12px; padding: 16px;
+  font-size: 15px; font-weight: 600; cursor: pointer; width: 100%;
+  font-family: inherit; transition: background 0.15s; letter-spacing: 0.01em;
+}
+.btn-green:active { background: var(--green-mid); transform: scale(0.98); }
+.btn-green:disabled { background: #ccc; color: #999; }
+.btn-ghost {
+  background: transparent; color: var(--text-2);
+  border: 1px solid var(--border); border-radius: 12px; padding: 13px;
+  font-size: 14px; cursor: pointer; width: 100%; font-family: inherit;
+}
+.btn-ghost:active { background: var(--surface); }
+.hint { font-size: 12px; color: var(--text-3); text-align: center; }
+
+/* ── item card ── */
+.item-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.item-head {
+  padding: 11px 14px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.item-num { font-size: 13px; font-weight: 600; }
+.item-ready { font-size: 11px; color: var(--green); font-weight: 500; }
+.item-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+
+/* ── camera buttons ── */
+.camera-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cam-btn {
+  border-radius: 10px; border: 2px dashed var(--border);
+  padding: 18px 12px; text-align: center; cursor: pointer;
+  transition: all 0.15s; background: var(--surface); position: relative; overflow: hidden;
+}
+.cam-btn input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.cam-btn:hover { border-color: var(--green-mid); background: var(--green-bg); }
+.cam-btn svg { width: 24px; height: 24px; color: var(--text-3); margin-bottom: 6px; display: block; margin-left: auto; margin-right: auto; }
+.cam-btn span { font-size: 12px; font-weight: 500; color: var(--text-2); display: block; }
+.cam-btn.active { border-style: solid; border-color: var(--green-mid); background: var(--green-bg); }
+.cam-btn.active svg { color: var(--green); }
+.cam-btn.active span { color: var(--green); }
+
+/* ── photo strip ── */
+.photo-strip { display: flex; gap: 6px; flex-wrap: wrap; }
+.photo-thumb { width: 60px; height: 60px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); flex-shrink: 0; position: relative; }
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb-del { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,0.5); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.thumb-del svg { width: 8px; height: 8px; color: white; }
+
+/* ── condition toggle ── */
+.cond-toggle { display: flex; gap: 6px; }
+.tog {
+  flex: 1; padding: 9px; border-radius: 8px; border: 1.5px solid var(--border);
+  text-align: center; font-size: 12px; font-weight: 600; cursor: pointer;
+  color: var(--text-3); background: var(--card); transition: all 0.12s;
+}
+.tog.on-used { background: var(--blue-bg); border-color: var(--blue-mid); color: var(--blue-dark); }
+.tog.on-new  { background: var(--green-bg); border-color: var(--green-mid); color: var(--green); }
+
+/* ── qty ── */
+.qty-row { display: flex; align-items: center; gap: 12px; }
+.qty-label { font-size: 13px; color: var(--text-2); }
+.qty-ctrl { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.qty-b { width: 40px; height: 40px; background: var(--surface); border: none; cursor: pointer; font-size: 18px; color: var(--text); display: flex; align-items: center; justify-content: center; }
+.qty-b:active { background: var(--border); }
+.qty-v { width: 44px; text-align: center; font-size: 16px; font-weight: 600; border-left: 1px solid var(--border); border-right: 1px solid var(--border); line-height: 40px; }
+
+/* ── submit ── */
+.uploading { display: flex; align-items: center; gap: 8px; padding: 12px; background: var(--amber-bg); border-radius: 8px; font-size: 13px; color: var(--amber); }
+.spinner { width: 16px; height: 16px; border: 2px solid var(--amber); border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── batch list ── */
+.batch-list { display: flex; flex-direction: column; gap: 6px; }
+.batch-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+.bi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-done { background: #16a34a; }
+.dot-scan { background: #f59e0b; }
+.bi-info { flex: 1; min-width: 0; }
+.bi-title { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bi-meta  { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+.bi-badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; }
+.badge-done { background: var(--green-bg); color: var(--green); }
+.badge-scan { background: var(--amber-bg); color: var(--amber); }
+
+/* ── complete ── */
+.complete-card { background: var(--green-bg); border: 1px solid #97C459; border-radius: 14px; padding: 20px; text-align: center; }
+.complete-title { font-size: 16px; font-weight: 600; color: var(--green); }
+.complete-sub   { font-size: 13px; color: var(--green-mid); margin-top: 4px; }
+
+/* ── section label ── */
+.sec-label { font-size: 10px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* ── views ── */
+.view { display: none; flex-direction: column; gap: 14px; }
+.view.active { display: flex; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo-mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+      <circle cx="12" cy="13" r="4"/>
+    </svg>
+  </div>
+  <span class="logo-text">Lister AI</span>
+  <span class="logo-sub">Scan</span>
+  <div class="spacer"></div>
+  <div class="batch-pill" id="batchPill">Batch active</div>
+</div>
+
+<div class="main">
+
+  <!-- START VIEW -->
+  <div class="view active" id="startView">
+    <div class="sec-label">Item condition</div>
+    <div class="cond-row">
+      <div class="cond-btn used active" id="condUsed" onclick="selectBatchCond('used')">
+        <div class="cond-icon ci-used">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/></svg>
+        </div>
+        <div>
+          <div class="cond-label">Used</div>
+          <div class="cond-sub">Pre-owned</div>
+        </div>
+        <div class="check-ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      </div>
+      <div class="cond-btn new" id="condNew" onclick="selectBatchCond('new')">
+        <div class="cond-icon ci-new">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <div>
+          <div class="cond-label">New</div>
+          <div class="cond-sub">Unused</div>
+        </div>
+        <div class="check-ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>
+      </div>
+    </div>
+    <button class="btn-green" onclick="startBatch()">Start batch scan</button>
+    <div class="hint" id="condHint">All items will be marked as <strong>used</strong></div>
+  </div>
+
+  <!-- SCAN VIEW -->
+  <div class="view" id="scanView">
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="sc-scanned">0</div><div class="stat-l">Scanned</div></div>
+      <div class="stat"><div class="stat-n" id="sc-scanning">0</div><div class="stat-l">Processing</div></div>
+      <div class="stat"><div class="stat-n" id="sc-done">0</div><div class="stat-l">Done</div></div>
+    </div>
+
+    <div class="item-card">
+      <div class="item-head">
+        <span class="item-num" id="itemLabel">Item 1</span>
+        <span class="item-ready">Ready</span>
+      </div>
+      <div class="item-body">
+        <div class="camera-btns">
+          <div class="cam-btn" id="camBtn">
+            <input type="file" accept="image/*" capture="environment" id="cameraInput" onchange="handleFiles(this, true)" multiple>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+            <span>Take photo</span>
+          </div>
+          <div class="cam-btn" id="galBtn">
+            <input type="file" accept="image/*" id="galleryInput" onchange="handleFiles(this, false)" multiple>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            <span>Upload from gallery</span>
+          </div>
+        </div>
+
+        <div id="photoStrip" class="photo-strip" style="display:none"></div>
+
+        <div>
+          <div class="sec-label" style="margin-bottom:6px">Condition</div>
+          <div class="cond-toggle">
+            <div class="tog on-used" id="togUsed" onclick="setItemCond('used')">Used</div>
+            <div class="tog" id="togNew" onclick="setItemCond('new')">New</div>
+          </div>
+        </div>
+
+        <div class="qty-row">
+          <span class="qty-label">Quantity</span>
+          <div class="qty-ctrl">
+            <button class="qty-b" onclick="changeQty(-1)">−</button>
+            <div class="qty-v" id="qtyVal">1</div>
+            <button class="qty-b" onclick="changeQty(1)">+</button>
+          </div>
+        </div>
+
+        <div id="uploadingBadge" style="display:none" class="uploading">
+          <div class="spinner"></div>
+          <span id="uploadingText">Uploading photos...</span>
+        </div>
+
+        <button class="btn-green" id="doneBtn" onclick="submitItem()" disabled>Add photos to continue</button>
+      </div>
+    </div>
+
+    <div id="batchListWrap" style="display:none">
+      <div class="sec-label" style="margin-bottom:8px">This batch</div>
+      <div class="batch-list" id="batchList"></div>
+    </div>
+
+    <button class="btn-ghost" onclick="endBatch()">End batch</button>
+  </div>
+
+  <!-- COMPLETE VIEW -->
+  <div class="view" id="completeView">
+    <div class="complete-card">
+      <div class="complete-title">Batch complete</div>
+      <div class="complete-sub" id="completeSub">Items submitted for processing</div>
+    </div>
+    <div class="batch-list" id="completeList"></div>
+    <button class="btn-green" onclick="resetToStart()">Start new batch</button>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL = 'https://fmrecxmhvodmkuimvjhi.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtcmVjeG1odm9kbWt1aW12amhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUyNDI0MDMsImV4cCI6MjA5MDgxODQwM30._jU2dtBkK2aebiIBK-Nw_-2h1w7gmGunzssaaM8KoLY';
+
+let batchCond  = 'used';
+let itemCond   = 'used';
+let itemQty    = 1;
+let pendingFiles = [];
+let currentGroupId = null;
+let sessionId  = crypto.randomUUID();
+let batchItems = [];
+let uploading  = false;
+
+async function api(method, path, body) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : '',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json().catch(() => null);
+}
+
+async function storageUpload(filename, blob) {
+  const r = await fetch(`${SUPABASE_URL}/storage/v1/object/part-photos/${filename}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'image/jpeg',
+      'x-upsert': 'true',
+    },
+    body: blob,
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return filename;
+}
+
+async function compressImage(file) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const ctx    = canvas.getContext('2d');
+    const img    = new Image();
+    const url    = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      const max = 1600;
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h * max / w); w = max; }
+        else       { w = Math.round(w * max / h); h = max; }
+      }
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(resolve, 'image/jpeg', 0.88);
+    };
+    img.src = url;
+  });
+}
+
+function ts() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  return `${pad(d.getDate())}${pad(d.getMonth()+1)}${String(d.getFullYear()).slice(-2)}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+function selectBatchCond(c) {
+  batchCond = c;
+  document.getElementById('condUsed').classList.toggle('active', c==='used');
+  document.getElementById('condNew').classList.toggle('active', c==='new');
+  document.getElementById('condHint').innerHTML = `All items will be marked as <strong>${c}</strong>`;
+}
+
+async function startBatch() {
+  sessionId  = crypto.randomUUID();
+  batchItems = [];
+  itemCond   = batchCond;
+  document.getElementById('batchPill').style.display = 'block';
+  switchView('scan');
+  await createGroup();
+}
+
+async function createGroup() {
+  pendingFiles = []; itemQty = 1;
+  document.getElementById('qtyVal').textContent = '1';
+  document.getElementById('photoStrip').style.display = 'none';
+  document.getElementById('photoStrip').innerHTML = '';
+  document.getElementById('doneBtn').disabled = true;
+  document.getElementById('doneBtn').textContent = 'Add photos to continue';
+  document.getElementById('camBtn').classList.remove('active');
+  document.getElementById('galBtn').classList.remove('active');
+  document.getElementById('cameraInput').value = '';
+  document.getElementById('galleryInput').value = '';
+  document.getElementById('itemLabel').textContent = `Item ${batchItems.length + 1}`;
+  setItemCond(itemCond);
+
+  const data = await api('POST', 'listing_groups', {
+    session_id: sessionId,
+    status: 'waiting',
+    condition: itemCond,
+    quantity: 1,
+  });
+  currentGroupId = data[0]?.id;
+}
+
+function setItemCond(c) {
+  itemCond = c;
+  document.getElementById('togUsed').className = 'tog' + (c==='used' ? ' on-used' : '');
+  document.getElementById('togNew').className  = 'tog' + (c==='new'  ? ' on-new'  : '');
+}
+
+function changeQty(d) {
+  itemQty = Math.max(1, itemQty + d);
+  document.getElementById('qtyVal').textContent = itemQty;
+}
+
+async function handleFiles(input, fromCamera) {
+  if (!input.files.length) return;
+  const files = Array.from(input.files).slice(0, 10 - pendingFiles.length);
+  if (fromCamera) document.getElementById('camBtn').classList.add('active');
+  else            document.getElementById('galBtn').classList.add('active');
+
+  for (const file of files) {
+    const preview = URL.createObjectURL(file);
+    const thumb   = document.createElement('div');
+    thumb.className = 'photo-thumb';
+    const img = document.createElement('img');
+    img.src = preview;
+    const del = document.createElement('button');
+    del.className = 'thumb-del';
+    del.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    const idx = pendingFiles.length;
+    del.onclick = () => { pendingFiles.splice(idx, 1); thumb.remove(); updateDoneBtn(); };
+    thumb.appendChild(img); thumb.appendChild(del);
+    document.getElementById('photoStrip').appendChild(thumb);
+    pendingFiles.push(file);
+  }
+  document.getElementById('photoStrip').style.display = pendingFiles.length ? 'flex' : 'none';
+  updateDoneBtn();
+  input.value = '';
+}
+
+function updateDoneBtn() {
+  const btn = document.getElementById('doneBtn');
+  btn.disabled = pendingFiles.length === 0;
+  btn.textContent = pendingFiles.length ? 'Done — submit item' : 'Add photos to continue';
+}
+
+async function submitItem() {
+  if (!pendingFiles.length || uploading) return;
+  uploading = true;
+  document.getElementById('doneBtn').disabled = true;
+  document.getElementById('uploadingBadge').style.display = 'flex';
+
+  try {
+    for (let i = 0; i < pendingFiles.length; i++) {
+      document.getElementById('uploadingText').textContent = `Uploading photo ${i+1} of ${pendingFiles.length}...`;
+      const blob     = await compressImage(pendingFiles[i]);
+      const uid      = Math.random().toString(36).slice(2,8);
+      const filename = `${ts()}_${uid}_${i}.jpg`;
+      await storageUpload(filename, blob);
+      await api('POST', 'group_photos', { group_id: currentGroupId, photo_id: filename });
+    }
+
+    document.getElementById('uploadingText').textContent = 'Submitting...';
+    await api('PATCH', `listing_groups?id=eq.${currentGroupId}`, {
+      status: 'pending', condition: itemCond, quantity: itemQty,
+    });
+
+    batchItems.push({ group_id: currentGroupId, cond: itemCond, qty: itemQty, photos: pendingFiles.length, status: 'scanning' });
+    updateStats(); renderBatchList();
+    document.getElementById('batchListWrap').style.display = '';
+  } catch(err) {
+    alert('Upload failed: ' + err.message);
+  }
+
+  document.getElementById('uploadingBadge').style.display = 'none';
+  uploading = false;
+  await createGroup();
+}
+
+function updateStats() {
+  document.getElementById('sc-scanned').textContent  = batchItems.length;
+  document.getElementById('sc-scanning').textContent = batchItems.filter(i=>i.status==='scanning').length;
+  document.getElementById('sc-done').textContent     = batchItems.filter(i=>i.status==='done').length;
+}
+
+function renderBatchList() {
+  document.getElementById('batchList').innerHTML = batchItems.slice().reverse().map(item => `
+    <div class="batch-item">
+      <div class="bi-dot ${item.status==='done'?'dot-done':'dot-scan'}"></div>
+      <div class="bi-info">
+        <div class="bi-title">${item.photos} photo${item.photos>1?'s':''} · Qty ${item.qty}</div>
+        <div class="bi-meta">${item.cond}</div>
+      </div>
+      <span class="bi-badge ${item.status==='done'?'badge-done':'badge-scan'}">${item.status==='done'?'Done':'Scanning'}</span>
+    </div>`).join('');
+}
+
+async function endBatch() {
+  currentGroupId = null;
+  switchView('complete');
+  document.getElementById('batchPill').style.display = 'none';
+  document.getElementById('completeSub').textContent = `${batchItems.length} item${batchItems.length!==1?'s':''} submitted for processing`;
+  document.getElementById('completeList').innerHTML = batchItems.slice().reverse().map(item => `
+    <div class="batch-item">
+      <div class="bi-dot dot-done"></div>
+      <div class="bi-info">
+        <div class="bi-title">${item.photos} photo${item.photos>1?'s':''} · Qty ${item.qty}</div>
+        <div class="bi-meta">${item.cond}</div>
+      </div>
+      <span class="bi-badge badge-done">Submitted</span>
+    </div>`).join('');
+}
+
+function resetToStart() {
+  batchItems = []; sessionId = crypto.randomUUID();
+  switchView('start');
+}
+
+function switchView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById(v + 'View').classList.add('active');
+}
+</script>
+</body>
+</html>
