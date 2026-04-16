@@ -611,9 +611,9 @@ CRITICAL RULES:
             active_high  = price_new_high if price_new_high > 0 else price_used_high
             price_note   = "used" if price_new == 0 and price_used > 0 else ""
 
-    except Exception as e:
-        print(f"   ⚠️  Gemini error: {e}")
-        title, ebay_category, price_note = "Unknown Item", "", ""
+    except Exception as _gemini_err:
+        print(f"   ⚠️  Gemini error: {_gemini_err}")
+        title, ebay_category, price_note = "Industrial Part", "", ""
         ebay_category_id = "0"
         weight_oz = weight_lb = 0.00
         price_used = price_used_low = price_used_high = 0.00
