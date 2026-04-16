@@ -674,6 +674,7 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
 
         # eBay accepts up to 12 photos, pipe-separated in the URL column
         pic_url_str = "|".join(pic_urls[:12])
+        if len(pic_urls) > 1: print(f"CSV: {len(pic_urls)} photos for {main_photo}")
 
         writer.writerow([
             "Draft",
