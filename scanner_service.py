@@ -38,7 +38,7 @@ def load_seen() -> set:
         result = supabase.table("seen_files").select("filename").execute()
         return {row["filename"] for row in (result.data or [])}
     except Exception as _err:
-        print(f"⚠️  Could not load seen_files from Supabase: {e}")
+        print(f"⚠️  Could not load seen_files from Supabase: {_err}")
         return set()
 
 def mark_seen(filename: str):
@@ -48,7 +48,7 @@ def mark_seen(filename: str):
             on_conflict="filename"
         ).execute()
     except Exception as _err:
-        print(f"⚠️  Could not mark {filename} as seen: {e}")
+        print(f"⚠️  Could not mark {filename} as seen: {_err}")
 
 # ------------------------------------------------------------------ #
 #  MODEL PICKER
@@ -73,7 +73,7 @@ def resolve_model():
             print(f"✅ Using model: {gen_models[0]}")
             return gen_models[0]
     except Exception as _err:
-        print(f"⚠️  Model list failed: {e}")
+        print(f"⚠️  Model list failed: {_err}")
     return "models/gemini-1.5-pro"
 
 model = resolve_model()
@@ -139,7 +139,7 @@ def rename_in_supabase(raw_bytes: bytes, old_name: str, new_name: str) -> bool:
         print(f"   🔁 Renamed: {old_name} → {new_name}")
         return True
     except Exception as _err:
-        print(f"   ⚠️  Rename failed: {e}")
+        print(f"   ⚠️  Rename failed: {_err}")
         return False
 
 # ------------------------------------------------------------------ #
@@ -207,7 +207,7 @@ def _ebay_find(operation: str, keywords: str, extra_params: dict = {}) -> list[d
                 continue
         return results
     except Exception as _err:
-        print(f"   eBay API error ({operation}): {e}")
+        print(f"   eBay API error ({operation}): {_err}")
         return []
 
 
@@ -498,7 +498,7 @@ CRITICAL RULES:
         print(f"   \U0001f522 Part number:  {parsed_data.get('verified_part_number')}")
         print(f"   \u2705 Title:        {title_for_ebay}")
     except Exception as _err:
-        print(f"   \u26a0\ufe0f  ID pass failed: {e}")
+        print(f"   \u26a0\ufe0f  ID pass failed: {_err}")
     if not title_for_ebay:
         title_for_ebay = "Industrial Part"
         print(f"   ⚠️  ID pass failed: {_err}")
@@ -736,7 +736,7 @@ def process_legacy_photo(file_info):
         print(f"   ✅ {title} — used: ${price_used:.2f} / new: ${price_new:.2f}")
 
     except Exception as _err:
-        print(f"   ⚠️  Error: {e}")
+        print(f"   ⚠️  Error: {_err}")
 
 # ------------------------------------------------------------------ #
 #  WATCHER LOOP
@@ -757,7 +757,7 @@ if len(seen_files) == 0:
         seen_files = existing
         print(f"📋 Seeded {len(seen_files)} existing files — watching for new ones only.")
     except Exception as _err:
-        print(f"⚠️  Could not seed existing files: {e}")
+        print(f"⚠️  Could not seed existing files: {_err}")
 
 while True:
     try:
