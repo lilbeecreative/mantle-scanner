@@ -37,7 +37,7 @@ def load_seen() -> set:
     try:
         result = supabase.table("seen_files").select("filename").execute()
         return {row["filename"] for row in (result.data or [])}
-    except Exception as e:
+    except Exception as _err:
         print(f"⚠️  Could not load seen_files from Supabase: {e}")
         return set()
 
@@ -47,7 +47,7 @@ def mark_seen(filename: str):
             {"filename": filename},
             on_conflict="filename"
         ).execute()
-    except Exception as e:
+    except Exception as _err:
         print(f"⚠️  Could not mark {filename} as seen: {e}")
 
 # ------------------------------------------------------------------ #
@@ -72,7 +72,7 @@ def resolve_model():
         if gen_models:
             print(f"✅ Using model: {gen_models[0]}")
             return gen_models[0]
-    except Exception as e:
+    except Exception as _err:
         print(f"⚠️  Model list failed: {e}")
     return "models/gemini-1.5-pro"
 
@@ -138,7 +138,7 @@ def rename_in_supabase(raw_bytes: bytes, old_name: str, new_name: str) -> bool:
         supabase.storage.from_("part-photos").remove([old_name])
         print(f"   🔁 Renamed: {old_name} → {new_name}")
         return True
-    except Exception as e:
+    except Exception as _err:
         print(f"   ⚠️  Rename failed: {e}")
         return False
 
@@ -206,7 +206,7 @@ def _ebay_find(operation: str, keywords: str, extra_params: dict = {}) -> list[d
             except Exception:
                 continue
         return results
-    except Exception as e:
+    except Exception as _err:
         print(f"   eBay API error ({operation}): {e}")
         return []
 
@@ -432,8 +432,8 @@ def process_group(group: dict):
 
             time.sleep(1)
 
-        except Exception as e:
-            print(f"   ⚠️  Error processing photo {old_name}: {e}")
+        except Exception as _err:
+            print(f"   ⚠️  Error processing photo {old_name}: {_err}")
 
     if not image_parts:
         print(f"   ⚠️  No images could be processed")
@@ -483,7 +483,7 @@ CRITICAL RULES:
                 if "503" in err or "UNAVAILABLE" in err or "429" in err:
                     print(f"   \u23f3 Gemini Pro busy, retrying in 15s...")
                     time.sleep(15)
-                elif "404" in err or "deprecated" in err.lower():
+                elif "404" in err or "deprecated" in err.lower() or "429" in err or "quota" in err.lower() or "RESOURCE_EXHAUSTED" in err:
                     id_model = model
                     print(f"   \u26a0\ufe0f  Pro unavailable, falling back to {model}")
                 else:
@@ -497,11 +497,11 @@ CRITICAL RULES:
         print(f"   \U0001f3f7\ufe0f  Brand:        {parsed_data.get('verified_brand')}")
         print(f"   \U0001f522 Part number:  {parsed_data.get('verified_part_number')}")
         print(f"   \u2705 Title:        {title_for_ebay}")
-    except Exception as e:
+    except Exception as _err:
         print(f"   \u26a0\ufe0f  ID pass failed: {e}")
     if not title_for_ebay:
         title_for_ebay = "Industrial Part"
-        print(f"   ⚠️  ID pass failed: {e}")
+        print(f"   ⚠️  ID pass failed: {_err}")
 
     # ---- STEP 2: Fetch real eBay prices (sold + active) ----
     ebay_data = {}
@@ -735,7 +735,7 @@ def process_legacy_photo(file_info):
 
         print(f"   ✅ {title} — used: ${price_used:.2f} / new: ${price_new:.2f}")
 
-    except Exception as e:
+    except Exception as _err:
         print(f"   ⚠️  Error: {e}")
 
 # ------------------------------------------------------------------ #
@@ -756,7 +756,7 @@ if len(seen_files) == 0:
             mark_seen(fname)
         seen_files = existing
         print(f"📋 Seeded {len(seen_files)} existing files — watching for new ones only.")
-    except Exception as e:
+    except Exception as _err:
         print(f"⚠️  Could not seed existing files: {e}")
 
 while True:
@@ -791,7 +791,7 @@ while True:
                     # Part of a group — just mark as seen
                     mark_seen(f['name'])
 
-    except Exception as e:
-        print(f"⚠️  Connection hiccup: {e}")
+    except Exception as _err:
+        print(f"⚠️  Connection hiccup: {_err}")
 
     time.sleep(5)
