@@ -635,6 +635,7 @@ EBAY_DESCRIPTION_CSV = """Shipped primarily with UPS and sometimes USPS. If you 
 
 This item is sold in "as-is" condition. The seller assumes no liability for the use, operation, or installation of this product. Due to the technical nature of this equipment, the buyer is responsible for having the item professionally inspected and installed by a certified technician prior to use."""
 
+@st.cache_data(ttl=0, show_spinner=False)
 def build_ebay_csv(df: pd.DataFrame) -> bytes:
     output = io.StringIO()
     output.write('#INFO,Version=0.0.2,Template= eBay-draft-listings-template_US,,,,,,,,\n')
