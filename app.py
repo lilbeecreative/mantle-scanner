@@ -667,8 +667,8 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
                 group_id = gp.data[0]["group_id"]
                 all_photos = supabase.table("group_photos").select("photo_id").eq("group_id", group_id).execute()
                 pic_urls = [photo_url(p["photo_id"]) for p in (all_photos.data or []) if p.get("photo_id")]
-        except Exception:
-            pass
+        except Exception as csv_err:
+            print(f"CSV photo lookup error: {csv_err}")
         if not pic_urls and main_photo:
             pic_urls = [photo_url(main_photo)]
 
