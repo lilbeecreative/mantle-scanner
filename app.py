@@ -1268,9 +1268,7 @@ elif st.session_state.active_tab == "dashboard":
                 </div>
               </div>
               <div style='padding:10px 11px 8px;'>
-                <div style='font-size:13px;font-weight:700;color:#f8fafc;line-height:1.4;
-                min-height:38px;display:-webkit-box;-webkit-line-clamp:2;
-                -webkit-box-orient:vertical;overflow:hidden;'>{t['title']}</div>
+                <a href='https://www.google.com/search?q={t["title"].replace(" ","+")}' target='_blank' style='font-size:13px;font-weight:700;color:#f8fafc;line-height:1.4;min-height:38px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-decoration:none;' title='Search Google'>{t["title"]} 🔍</a>
                 <div style='font-size:10px;color:#475569;margin-top:3px;white-space:nowrap;
                 overflow:hidden;text-overflow:ellipsis;'>{t['category']}</div>
               </div>
