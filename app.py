@@ -946,6 +946,12 @@ if st.session_state.active_tab == "batch":
 
             # File uploader — this is the MAIN action, always visible
             st.markdown("<div style='color:#64748b;font-size:0.72rem;margin-bottom:4px;'>📐 Tip: shoot in landscape (horizontal) for best results</div>", unsafe_allow_html=True)
+            st.markdown("""<div style='background:#0f2d1a;border:1px solid #16a34a;border-radius:8px;padding:10px 14px;margin-bottom:8px;'>
+            <div style='color:#86efac;font-size:0.8rem;font-weight:600;margin-bottom:4px;'>📱 Android users</div>
+            <a href='https://lilbeecreative.github.io/lister-scan' target='_blank' style='color:#4ade80;font-size:0.85rem;font-weight:700;text-decoration:none;'>
+            → Tap here to open camera scanner</a>
+            <div style='color:#64748b;font-size:0.72rem;margin-top:2px;'>Opens native camera, uploads to same dashboard</div>
+            </div>""", unsafe_allow_html=True)
             cam_col, up_col = st.columns([1,1])
             with cam_col:
                 camera_photo = st.camera_input("📷 Take Photo", key=f"cam_{st.session_state.file_group_id}")
