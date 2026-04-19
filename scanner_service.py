@@ -211,6 +211,36 @@ def _ebay_find(operation: str, keywords: str, extra_params: dict = {}) -> list[d
         return []
 
 
+
+_ebay_oauth_token = None
+_ebay_oauth_expiry = 0
+
+def get_ebay_token():
+    global _ebay_oauth_token, _ebay_oauth_expiry
+    import time, base64
+    import requests as _req
+    if _ebay_oauth_token and time.time() < _ebay_oauth_expiry - 60:
+        return _ebay_oauth_token
+    EBAY_CERT_ID = os.getenv("EBAY_CERT_ID", "")
+    if not EBAY_APP_ID or not EBAY_CERT_ID:
+        return ""
+    try:
+        creds = base64.b64encode(f"{EBAY_APP_ID}:{EBAY_CERT_ID}".encode()).decode()
+        r = _req.post(
+            "https://api.ebay.com/identity/v1/oauth2/token",
+            headers={"Authorization": f"Basic {creds}", "Content-Type": "application/x-www-form-urlencoded"},
+            data="grant_type=client_credentials&scope=https://api.ebay.com/oauth/api_scope",
+            timeout=10,
+        )
+        data = r.json()
+        _ebay_oauth_token  = data.get("access_token", "")
+        _ebay_oauth_expiry = time.time() + int(data.get("expires_in", 7200))
+        return _ebay_oauth_token
+    except Exception as err:
+        print(f"   eBay OAuth error: {err}")
+        return ""
+
+
 def fetch_ebay_prices(title: str) -> dict:
     """
     Fetch both sold and active eBay listings for a title.
