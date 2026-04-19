@@ -838,7 +838,7 @@ if st.session_state.active_tab == "batch":
         }).execute()
         return result.data[0]["id"]
 
-    for k,v in [("file_batch_id",None),("file_condition","used"),("file_items",[]),("file_group_id",None),("file_qty",1)]:
+    for k,v in [("file_batch_id",None),("file_condition","new"),("file_items",[]),("file_group_id",None),("file_qty",1)]:
         if k not in st.session_state: st.session_state[k] = v
 
     # ── NO ACTIVE BATCH — just condition + start ──────────────────
@@ -948,19 +948,18 @@ if st.session_state.active_tab == "batch":
             st.markdown("<div style='color:#64748b;font-size:0.72rem;margin-bottom:4px;'>📐 Tip: shoot in landscape (horizontal) for best results</div>", unsafe_allow_html=True)
             cam_col, up_col = st.columns([1,1])
             with cam_col:
-                camera_photo = st.camera_input("📷 Take photo", key=f"cam_{st.session_state.file_group_id}", label_visibility="collapsed")
+                camera_photo = st.camera_input("📷 Take Photo", key=f"cam_{st.session_state.file_group_id}")
             with up_col:
-                st.markdown("<div style='font-size:0.75rem;color:#64748b;margin-bottom:4px;'>Or upload from gallery</div>", unsafe_allow_html=True)
+                gallery_files = st.file_uploader(
+                    "🖼️ Upload from Gallery",
+                    type=["jpg","jpeg","png","heic"],
+                    accept_multiple_files=True,
+                    key=f"fup_{st.session_state.file_group_id}",
+                )
 
-            uploaded_files = st.file_uploader(
-                "Tap to take photo or select from library",
-                type=["jpg","jpeg","png","heic"],
-                accept_multiple_files=True,
-                key=f"fup_{st.session_state.file_group_id}",
-                label_visibility="collapsed"
-            )
-            if camera_photo and camera_photo not in (uploaded_files or []):
-                uploaded_files = list(uploaded_files or []) + [camera_photo]
+            uploaded_files = list(gallery_files or [])
+            if camera_photo and camera_photo not in uploaded_files:
+                uploaded_files = [camera_photo] + uploaded_files
             if uploaded_files and len(uploaded_files) > 10:
                 st.warning("Max 10 photos — using first 10.")
                 uploaded_files = uploaded_files[:10]
