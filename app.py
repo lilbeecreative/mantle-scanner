@@ -669,7 +669,7 @@ def build_ebay_csv(df: pd.DataFrame) -> bytes:
                 all_photos = supabase.table("group_photos").select("photo_id").eq("group_id", group_id).execute()
                 pic_urls = [photo_url(p["photo_id"]) for p in (all_photos.data or []) if p.get("photo_id")]
         except Exception as csv_err:
-            print(f"CSV photo lookup error: {csv_err}")
+            import traceback; traceback.print_exc()
         if not pic_urls and main_photo:
             pic_urls = [photo_url(main_photo)]
 
@@ -761,7 +761,7 @@ box-shadow: 0 1px 4px rgba(0,0,0,0.06);'>
 
 # Color-coded nav toolbar — separated from page content
 st.markdown("<div style='background:#161925; border-bottom:1px solid #2d3348; padding:4px 8px;'>", unsafe_allow_html=True)
-t1, t3, t5, t6, t7 = st.columns([2, 1.5, 1.5, 1, 1.5])
+t1, t3, t7 = st.columns([2, 1.5, 1.5])
 with t1:
     st.markdown("<div class='tab-dashboard'>", unsafe_allow_html=True)
     if st.button("📊  Batch Dashboard", use_container_width=True,
@@ -774,20 +774,6 @@ with t3:
     if st.button("📁  Batch Upload", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "batch" else "secondary"):
         st.session_state.active_tab = "batch"
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-with t5:
-    st.markdown("<div class='tab-auction'>", unsafe_allow_html=True)
-    if st.button("🔨  Auction Scanner", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "auction" else "secondary"):
-        st.session_state.active_tab = "auction"
-        st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-with t6:
-    st.markdown("<div class='tab-settings'>", unsafe_allow_html=True)
-    if st.button("⚙️  Settings", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "settings" else "secondary"):
-        st.session_state.active_tab = "settings"
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 with t7:
@@ -1340,7 +1326,7 @@ elif st.session_state.active_tab == "dashboard":
                         <div style='position:absolute;top:6px;right:6px;'>{status_badge}</div>
                       </div>
                       <div style='padding:8px 10px 4px;'>
-                        <div style='font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.3;min-height:32px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'>{t['title']}</div>
+                        <a href='https://www.google.com/search?q={t["title"].replace(" ","+")}' target='_blank' style='font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.3;min-height:32px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-decoration:none;' title='Search Google'>{t['title']} 🔍</a>
                         <div style='font-size:10px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{t['category']}</div>
                         <div style='display:flex;align-items:baseline;justify-content:space-between;margin-top:6px;'>
                           <div style='font-size:18px;font-weight:800;color:#e2e8f0;letter-spacing:-0.3px;'>${t['price']:.2f}</div>
