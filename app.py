@@ -1273,7 +1273,7 @@ elif st.session_state.active_tab == "dashboard":
                 </div>
               </div>
               <div style='padding:10px 11px 8px;'>
-                <a href='https://www.google.com/search?q={t["title"].replace(" ","+")}' target='_blank' style='font-size:13px;font-weight:700;color:#f8fafc;line-height:1.4;min-height:38px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-decoration:none;' title='Search Google'>{t["title"]} 🔍</a>
+                <a href='https://www.google.com/search?q={urllib.parse.quote_plus(str(t["title"]))}' target='_blank' style='font-size:13px;font-weight:700;color:#f8fafc;line-height:1.4;min-height:38px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-decoration:none;' title='Search Google'>{t["title"]} 🔍</a>
                 <div style='font-size:10px;color:#475569;margin-top:3px;white-space:nowrap;
                 overflow:hidden;text-overflow:ellipsis;'>{t['category']}</div>
               </div>
@@ -1329,7 +1329,7 @@ elif st.session_state.active_tab == "dashboard":
                         <div style='position:absolute;top:6px;right:6px;'>{status_badge}</div>
                       </div>
                       <div style='padding:8px 10px 4px;'>
-                        <a href='https://www.google.com/search?q={t["title"].replace(" ","+")}' target='_blank' style='font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.3;min-height:32px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-decoration:none;' title='Search Google'>{t['title']} 🔍</a>
+                        <a href='https://www.google.com/search?q={urllib.parse.quote_plus(str(t["title"]))}' target='_blank' style='font-size:12px;font-weight:600;color:#e2e8f0;line-height:1.3;min-height:32px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-decoration:none;' title='Search Google'>{t['title']} 🔍</a>
                         <div style='font-size:10px;color:#64748b;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{t['category']}</div>
                         <div style='display:flex;align-items:baseline;justify-content:space-between;margin-top:6px;'>
                           <div style='font-size:18px;font-weight:800;color:#e2e8f0;letter-spacing:-0.3px;'>${t['price']:.2f}</div>
