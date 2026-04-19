@@ -585,7 +585,7 @@ CRITICAL RULES:
                     "https://api.ebay.com/commerce/taxonomy/v1/category_tree/0/get_category_suggestions",
                     params={"q": title},
                     headers={
-                        "Authorization": f"Bearer {EBAY_APP_ID}",
+                        "Authorization": f"Bearer {get_ebay_token()}",
                         "Content-Type": "application/json"
                     },
                     timeout=5
