@@ -530,7 +530,7 @@ CRITICAL RULES:
     except Exception as _err:
         print(f"   \u26a0\ufe0f  ID pass failed: {_err}")
     if not title_for_ebay:
-        title_for_ebay = "Industrial Part"
+        title_for_ebay = ""
         print(f"   ⚠️  ID pass failed: {_err}")
 
     # ---- STEP 2: Fetch real eBay prices (sold + active) ----
