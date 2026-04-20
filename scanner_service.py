@@ -643,7 +643,7 @@ CRITICAL RULES:
 
     except Exception as _gemini_err:
         print(f"   ⚠️  Gemini error: {_gemini_err}")
-        title, ebay_category, price_note = "Industrial Part", "", ""
+        title, ebay_category, price_note = title_for_ebay or "Industrial Part", "", ""
         ebay_category_id = "0"
         weight_oz = weight_lb = 0.00
         price_used = price_used_low = price_used_high = 0.00
