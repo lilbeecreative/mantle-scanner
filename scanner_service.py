@@ -758,7 +758,7 @@ def process_legacy_photo(file_info):
             "price_used":       price_used,
             "price_new":        price_new,
             "photo_id":         photo_id,
-            "condition":        "used",
+            "condition":        condition,
             "status":           "scanned",
             "created_at":       scanned_at,
         }).execute()
