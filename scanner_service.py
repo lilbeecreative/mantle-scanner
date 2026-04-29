@@ -474,24 +474,72 @@ def process_group(group: dict):
     print(f"   \U0001f50d Step 1: Identifying item from photos...")
     title_for_ebay = ""
     try:
-        id_prompt = """Analyze this photo of an industrial part for eBay resale.
+        id_prompt = """You are an industrial parts forensic identifier. Your job is to read what is actually on the part - not what you think it is.
 
-CRITICAL RULES:
-1. READ FIRST: Transcribe all visible text, numbers, and codes exactly as they appear. Look closely at stamped metal, worn labels, cast markings.
-2. NO GUESSING: Never assume a manufacturer based on color, shape, or style. If it is not written on the part, it is UNBRANDED.
-   EXCEPTION: If you can clearly read a brand name on a label, sticker, or packaging, that IS the brand.
-3. PACKAGING vs PART: If the item appears to be in a bag, box, or has a label — identify the PART INSIDE, not the packaging or label itself.
-   - A yellow CAT bag with part number 17C0033 = a Caterpillar part #17C0033, not a "sticker"
-   - A box with "Donaldson P182050" = a Donaldson filter, not a "box"
-   - Always identify what the part IS, not what it comes in
-3. INTERPRET CORRECTLY: Common stampings on industrial parts have specific meanings:
-   - "CAP XX TONS" means capacity is XX tons e.g. "CAP 10 TONS" = 10 Ton Capacity, NOT a brand called CAP and NOT 10,500 lbs
-   - "WLL XX" = working load limit, NOT a brand
-   - "SWL XX" = safe working load, NOT a brand
-   - "MAX XX LBS" = maximum load, NOT a brand
-   - Numbers alone (e.g. "15000") = weight/load rating in lbs
-   Include these as specs in the title, not as brand names.
-4. CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_part_number, then physical_description, then generated_title."""
+STAGE 1 - TRANSCRIBE
+Read every character on the item. Treat this like evidence - transcribe exactly what is written, not what makes sense:
+- Stamped metal (often faint, look for raised or recessed characters)
+- Printed labels and stickers (even partial ones)
+- Cast markings (raised letters molded into the part)
+- Hand-written tags
+- QR codes or barcodes (note their presence even if unreadable)
+
+Format: List every text element separated by ' | '. Example: 'PARKER | D1VW4CNYP | 24V DC | MADE IN USA | LOT 4521'
+If absolutely nothing is readable, write: NONE
+
+STAGE 2 - BRAND
+The brand is ONLY what is explicitly printed/stamped on the part itself. NO inference allowed.
+
+VALID brand sources:
+- Logo or wordmark on the part
+- Manufacturer label or sticker
+- Cast company name in metal
+- Original packaging if part is clearly inside it (CAT bag means Caterpillar)
+
+INVALID - do NOT use these as brand:
+- Color or paint scheme
+- Shape or style resemblance
+- Distributor names (Grainger, McMaster, MSC are sellers not brands)
+
+If no brand is verifiable: UNBRANDED
+
+STAGE 3 - PART NUMBER
+The part number is the most valuable piece of data. It unlocks identification, pricing, and category.
+
+Look for alphanumeric strings that match these patterns:
+- 6-12 character codes with mixed letters/numbers (D1VW4CNYP, 1756-IF16, 6ES7-321)
+- P/N, MODEL, CAT NO, ORDER NO prefixes
+- Codes near barcodes
+- Codes etched or engraved
+
+Common formats by industry:
+- Allen Bradley: 4-digit-XX (1756-IF16, 1769-L33ER)
+- Siemens: 6ES7 followed by code
+- Parker: Letter prefix + numbers (D1VW4CNYP)
+- Caterpillar: Numbers + letters (17C0033, 1R-0750)
+- SKF/FAG bearings: Numeric codes (6203-2RS)
+
+If multiple codes, the PART NUMBER is usually the longest/most prominent. Other codes may be lot numbers, date codes, or stock numbers.
+
+If no part number is verifiable: UNKNOWN
+
+STAGE 4 - PHYSICAL DESCRIPTION
+Describe what you SEE in 1 sentence: form factor, size estimate, condition, distinguishing features.
+
+STAGE 5 - GENERATED TITLE
+Build the title in this exact priority order, dropping items only when 80 chars is exceeded:
+
+[BRAND] [PART_NUMBER] [ITEM_TYPE] [KEY_SPEC] [CONDITION_DESCRIPTOR]
+
+Rules:
+1. NEVER cut off mid-word - end at a clean word boundary
+2. Item type must be SPECIFIC (Solenoid Valve not Valve)
+3. Key spec is the most marketable detail: voltage, port size, capacity, range
+4. NEVER use these words: Empty, Box, Bag, Packaging, Sticker, Label, Memorabilia, Lot of
+5. If part is in packaging, identify the part inside (CAT 17C0033 bag means Caterpillar 17C0033 Seal Kit)
+6. Title Case format
+
+CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_part_number, then physical_description, then generated_title."""
 
         id_model = "models/gemini-2.5-pro"
         id_resp = None
