@@ -308,81 +308,82 @@ def fetch_ebay_prices(title: str) -> dict:
 # ------------------------------------------------------------------ #
 
 def make_prompt(photo_count: int, condition: str = "used", ebay_data: dict = None, id_title: str = "") -> str:
-    ebay_section = ""
     if ebay_data and ebay_data.get("has_data"):
-        ebay_section = f"""
+        market_section = f"""EBAY MARKET DATA (PRIMARY SOURCE):
 {ebay_data["summary"]}
 
-Use the eBay market data above as your PRIMARY source for pricing.
-Also use Google Search to verify and supplement with additional sold listings.
-Prioritize sold listings over active listings for pricing accuracy.
-"""
+Use these prices as your foundation. Verify with Google Search for any sold listings missing from this data."""
     else:
-        ebay_section = """
-Use your Google Search tool to find current eBay pricing for this item. Search for:
-1. eBay SOLD listings (site:ebay.com "sold" keyword) — most important for accurate pricing
-2. eBay active Buy It Now listings
-3. Amazon pricing
-4. Any other marketplace (Reverb, OfferUp, Facebook Marketplace, etc.)
-Search for both USED and NEW condition prices separately and report all prices found.
-"""
+        market_section = """MARKET RESEARCH (USE GOOGLE SEARCH):
+Run these searches IN ORDER:
+1. PRIMARY: '[brand] [part number] sold ebay' - find sold/completed listings
+2. SECONDARY: '[brand] [part number] ebay' - find active Buy It Now listings
+3. TERTIARY: '[brand] [part number] price' - find dealer/distributor pricing
+4. VERIFICATION: '[brand] [part number] datasheet' - confirm correct item
 
-    id_section = f"""
-IDENTIFIED INFO: "{id_title}"
+Prioritize SOLD prices over ACTIVE prices."""
 
-CRITICAL FIRST STEP: If the title contains a part number, search for it NOW before doing anything else.
-- Search Google: "[brand] [part number] site:ebay.com" to find the real item name
-- "Caterpillar 17C0033 Empty Bag" means part number is 17C0033 — search "CAT 17C0033" to find it is actually a specific seal, gasket, or component
-- NEVER use words like "Empty Bag", "Packaging", "Label", "Sticker", or "Memorabilia" in the title
-- The part number reveals the real item — always research it
-""" if id_title else ""
+    id_section = f"""PRE-IDENTIFIED TITLE: "{id_title}"
 
-    return f"""You are an expert industrial parts eBay pricing specialist analyzing {photo_count} photo(s).
+If a part number exists, RESEARCH IT to confirm correctness.
+Improve the title if research reveals the actual product name.
+NEVER keep generic words like Empty Bag, Industrial Part, Unknown Item.""" if id_title else ""
+
+    return f"""You are a senior industrial parts pricing specialist analyzing {photo_count} photo(s) for eBay resale.
 {id_section}
-TASK 1 — RESEARCH THE PART NUMBER:
-- The pre-identified title is your starting point: "{id_title}"
-- If it contains ANY part number or model number, search for it IMMEDIATELY
-- Search: "[brand] [part number]" on Google and eBay to find the exact item name
-- Example: "CAT 17C0033" → search → find it is a "Caterpillar 17C0033 Seal Kit" or similar
-- The part number is more important than any visual description
-- Replace vague titles like "Empty Bag" or "Industrial Part" with the real item name found via search
-- Never keep a generic title if a part number exists that you can research
 
-TASK 2 — PRICING RESEARCH:
-{ebay_section}
-The employee marked this item as: {condition}
+{market_section}
 
-TASK 3 — SELECT THE CORRECT EBAY CATEGORY:
-- Think carefully about what this item actually is before selecting a category
-- A trailer hitch goes in eBay Motors > Towing, NOT Sporting Goods
-- An industrial valve goes in Business & Industrial, NOT Home & Garden
-- Use your knowledge of the item type to pick the most specific accurate category
-- Search eBay to verify the category if unsure
+Employee marked this item as: {condition.upper()}
 
-Return ONLY a raw JSON object, no markdown, no backticks:
+PRICING WATERFALL - FOLLOW IN ORDER:
+
+TIER 1 (BEST): Recent SOLD eBay listings (last 90 days)
+- Use median of 3+ sold prices
+- USED items 60-80% of NEW sold price
+- If you find sold comps, STOP HERE
+
+TIER 2: Active eBay listings + Buy It Now
+- Active listings are 15-25% above true market value
+- Recommended price = lowest active times 0.85
+
+TIER 3: Dealer/distributor pricing (Grainger, MSC, AutomationDirect)
+- These are RETAIL - eBay resale is 40-60% of dealer for USED, 70-85% for NEW
+
+TIER 4: No market data found
+- Return 0 for all price fields
+- Do NOT guess or estimate
+
+CRITICAL RULES:
+1. NEVER fabricate prices. No data = return 0.
+2. NEVER claim sold prices unless explicit sold listing data found.
+3. Dealer prices need discount applied.
+4. NEW vs USED prices researched separately.
+
+EBAY CATEGORIES:
+- PLCs: 115708, Sensors: 78189, Hydraulic valves: 98463
+- Pumps: 12576, Cylinders: 123455, Seals: 123461
+- Motors: 124660, VFDs: 115082, CAT parts: 177007
+- Circuit breakers: 66825, Contactors: 66828
+
+OUTPUT - Return ONLY raw JSON:
 
 {{
-  "title": "Brand PartNumber ItemType KeySpec — keyword-rich eBay title under 80 chars",
-  "ebay_category": "full eBay category path e.g. eBay Motors > Parts & Accessories > ...",
-  "ebay_category_id": numeric eBay category ID as number,
-  "weight_oz": estimated weight in ounces as number,
-  "weight_lb": estimated weight in pounds as number,
-  "price_used_low": lowest used price found as number — 0 if none,
-  "price_used_high": highest used price found as number — 0 if none,
-  "price_used": recommended used listing price as number — 0 if none,
-  "price_new_low": lowest new price found as number — 0 if none,
-  "price_new_high": highest new price found as number — 0 if none,
-  "price_new": recommended new listing price as number — 0 if none
+  "title": "Improved title under 80 chars",
+  "ebay_category": "Full category path",
+  "ebay_category_id": <number>,
+  "weight_oz": <ounces>,
+  "weight_lb": <pounds>,
+  "price_used_low": <number>,
+  "price_used_high": <number>,
+  "price_used": <number>,
+  "price_new_low": <number>,
+  "price_new_high": <number>,
+  "price_new": <number>,
+  "pricing_tier": "SOLD_COMPS" or "ACTIVE_LISTINGS" or "DEALER_DISCOUNTED" or "NO_DATA",
+  "data_sources_count": <number>
 }}
-
-ABSOLUTE RULES:
-- NEVER return Unknown Item
-- Keep all part numbers from the pre-identified title
-- Category must match the actual item type — double check before returning"""
-
-# ------------------------------------------------------------------ #
-#  PROCESS A GROUP
-# ------------------------------------------------------------------ #
+"""
 
 def truncate_title(t: str, limit: int = 80) -> str:
     t = t.title()
