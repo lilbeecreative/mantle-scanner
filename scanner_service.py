@@ -401,9 +401,10 @@ class PartIdentification(BaseModel):
 
 
 def process_group(group: dict):
-    group_id  = group["id"]
-    condition = group.get("condition", "used")
-    quantity  = group.get("quantity", 1)
+    group_id    = group["id"]
+    condition   = group.get("condition", "used")
+    quantity    = group.get("quantity", 1)
+    business_id = group.get("business_id")
 
     print(f"\n📦 Processing group {group_id} — condition: {condition}, qty: {quantity}")
 
@@ -700,6 +701,7 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
         active_price = active_low = active_high = 0.00
 
     supabase.table("listings").insert({
+        "business_id":      business_id,
         "title":            title,
         "ebay_category":    ebay_category,
         "ebay_category_id": ebay_category_id,
@@ -795,6 +797,7 @@ def process_legacy_photo(file_info):
         price_note   = "new" if price_used == 0 and price_new > 0 else ""
 
         supabase.table("listings").insert({
+            "business_id":      business_id,
             "title":            title,
             "ebay_category":    ebay_category,
             "ebay_category_id": ebay_category_id,
