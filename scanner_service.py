@@ -547,7 +547,7 @@ Rules:
 
 CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_part_number, then physical_description, then generated_title."""
 
-        id_model = "models/gemini-2.5-pro"
+        id_model = "models/gemini-2.5-flash"
         id_resp = None
         for _attempt in range(3):
             try:
@@ -577,15 +577,46 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
         parsed_data    = json.loads(id_resp.text)
         title_for_ebay = parsed_data.get("generated_title", "").strip()
         text_found     = parsed_data.get("raw_text_read", "").strip()
+        verified_brand = parsed_data.get("verified_brand", "").strip()
+        verified_pn    = parsed_data.get("verified_part_number", "").strip()
+
+        # Flash-to-Pro escalation: if flash returned a weak result (no brand AND
+        # no part number), retry once with Pro for a more thorough read.
+        # Default flash gives us speed; Pro fallback gives accuracy on hard reads.
+        flash_was_weak = (not verified_brand) and (not verified_pn)
+        if id_model == "models/gemini-2.5-flash" and flash_was_weak:
+            print(f"   \U0001f504 Flash result low-confidence (no brand/PN), escalating to Pro...")
+            try:
+                pro_resp = client.models.generate_content(
+                    model="models/gemini-2.5-pro",
+                    contents=[*image_parts, id_prompt],
+                    config=types.GenerateContentConfig(
+                        temperature=0.0,
+                        system_instruction="You are an expert industrial parts identifier specializing in reading part numbers, model numbers, and brand names from photos. Your PRIMARY job is to find any alphanumeric codes on the item and transcribe them exactly. Part numbers are the most valuable piece of information — they unlock everything else. Even partial numbers are valuable. Read every character carefully.",
+                        response_mime_type="application/json",
+                        response_schema=PartIdentification,
+                    )
+                )
+                pro_parsed = json.loads(pro_resp.text)
+                if pro_parsed.get("verified_brand", "").strip() or pro_parsed.get("verified_part_number", "").strip():
+                    parsed_data    = pro_parsed
+                    title_for_ebay = parsed_data.get("generated_title", "").strip()
+                    text_found     = parsed_data.get("raw_text_read", "").strip()
+                    print(f"   \u2705 Pro escalation succeeded")
+                else:
+                    print(f"   \u2139\ufe0f  Pro returned no additional info, keeping flash result")
+            except Exception as _esc_err:
+                print(f"   \u26a0\ufe0f  Pro escalation failed (keeping flash result): {_esc_err}")
+
         print(f"   \U0001f4dd Text found:   {text_found[:100]}")
         print(f"   \U0001f3f7\ufe0f  Brand:        {parsed_data.get('verified_brand')}")
         print(f"   \U0001f522 Part number:  {parsed_data.get('verified_part_number')}")
         print(f"   \u2705 Title:        {title_for_ebay}")
     except Exception as _err:
-        print(f"   \u26a0\ufe0f  ID pass failed: {_err}")
+        id_err_msg = str(_err)
+        print(f"   \u26a0\ufe0f  ID pass failed: {id_err_msg}")
     if not title_for_ebay:
         title_for_ebay = ""
-        print(f"   ⚠️  ID pass failed: {_err}")
 
     # ---- STEP 2: Fetch real eBay prices (sold + active) ----
     ebay_data = {}
