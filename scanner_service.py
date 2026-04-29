@@ -350,15 +350,19 @@ TIER 2: Active eBay listings + Buy It Now
 TIER 3: Dealer/distributor pricing (Grainger, MSC, AutomationDirect)
 - These are RETAIL - eBay resale is 40-60% of dealer for USED, 70-85% for NEW
 
-TIER 4: No market data found
-- Return 0 for all price fields
-- Do NOT guess or estimate
+TIER 4: Limited or no market data found
+- Use your knowledge to provide a REASONABLE ESTIMATE based on item type
+- Generic items: blank cotton tee $5-15 used, $10-25 new; basic hardware $5-20
+- Industrial parts without data: use category-typical pricing as starting point
+- Set pricing_tier to "ESTIMATED" to be transparent
+- Better to provide a starting point than $0
 
 CRITICAL RULES:
-1. NEVER fabricate prices. No data = return 0.
-2. NEVER claim sold prices unless explicit sold listing data found.
+1. ONLY claim "SOLD_COMPS" if you found actual sold listing data with prices.
+2. If estimating, set pricing_tier to "ESTIMATED" - never falsely claim sold data.
 3. Dealer prices need discount applied.
 4. NEW vs USED prices researched separately.
+5. Always try to provide a reasonable price - $0 only for genuinely obscure items.
 
 EBAY CATEGORIES:
 - PLCs: 115708, Sensors: 78189, Hydraulic valves: 98463
