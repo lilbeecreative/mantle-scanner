@@ -746,8 +746,8 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
     api_sc = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
     if api_sc > 0:
         sold_count = api_sc
-    elif pricing_tier == "SOLD_COMPS" and data_sources_n > 0:
-        sold_count = data_sources_n
+    elif pricing_tier in ("SOLD_COMPS", "ACTIVE_LISTINGS", "DEALER_DISCOUNTED"):
+        sold_count = max(data_sources_n, 1)
     else:
         sold_count = 0
     supabase.table("listings").insert({
@@ -858,8 +858,8 @@ def process_legacy_photo(file_info):
         api_sc = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
         if api_sc > 0:
             sold_count = api_sc
-        elif pricing_tier == "SOLD_COMPS" and data_sources_n > 0:
-            sold_count = data_sources_n
+        elif pricing_tier in ("SOLD_COMPS", "ACTIVE_LISTINGS", "DEALER_DISCOUNTED"):
+            sold_count = max(data_sources_n, 1)
         else:
             sold_count = 0
         supabase.table("listings").insert({
