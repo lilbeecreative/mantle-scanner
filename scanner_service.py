@@ -630,6 +630,11 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
         else:
             print(f"   ⚠️  eBay API unavailable — Gemini will search eBay + web directly")
 
+    # Initialize default values — these get overwritten by Gemini's response, but if
+    # Gemini fails entirely we still need them to exist for the sold_count calculation.
+    pricing_tier = ""
+    data_sources_n = 0
+
     # ---- STEP 3: Full Gemini pass with real eBay data injected ----
     prompt = make_prompt(len(image_parts), condition, ebay_data, id_title=title_for_ebay)
     # Always use Google Search — it finds eBay sold listings, Amazon, and other
