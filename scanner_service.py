@@ -691,6 +691,8 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
         price_new_low    = parse_num(data.get("price_new_low", 0))
         price_new_high   = parse_num(data.get("price_new_high", 0))
         price_new        = parse_num(data.get("price_new", 0))
+        pricing_tier    = str(data.get("pricing_tier", "")).strip().upper()
+        data_sources_n  = parse_int(data.get("data_sources_count", 0))
 
         # ---- eBay Category Suggestion API ----
         if title and title != "Unknown Item" and EBAY_APP_ID:
@@ -735,7 +737,14 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
         price_new  = price_new_low  = price_new_high  = 0.00
         active_price = active_low = active_high = 0.00
 
-    sold_count = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
+    # Sold count: prefer eBay API data, fall back to Gemini's web-search confirmation
+    api_sc = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
+    if api_sc > 0:
+        sold_count = api_sc
+    elif pricing_tier == "SOLD_COMPS" and data_sources_n > 0:
+        sold_count = data_sources_n
+    else:
+        sold_count = 0
     supabase.table("listings").insert({
         "business_id":      business_id,
         "title":            title,
@@ -836,7 +845,14 @@ def process_legacy_photo(file_info):
         active_high  = price_used_high if price_used_high > 0 else price_new_high
         price_note   = "new" if price_used == 0 and price_new > 0 else ""
 
-        sold_count = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
+        # Sold count: prefer eBay API data, fall back to Gemini's web-search confirmation
+    api_sc = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
+    if api_sc > 0:
+        sold_count = api_sc
+    elif pricing_tier == "SOLD_COMPS" and data_sources_n > 0:
+        sold_count = data_sources_n
+    else:
+        sold_count = 0
         supabase.table("listings").insert({
             "business_id":      business_id,
             "title":            title,
