@@ -735,6 +735,7 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
         price_new  = price_new_low  = price_new_high  = 0.00
         active_price = active_low = active_high = 0.00
 
+    sold_count = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
     supabase.table("listings").insert({
         "business_id":      business_id,
         "title":            title,
@@ -752,6 +753,7 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
         "quantity":         quantity,
         "condition":        condition,
         "status":           "scanned",
+        "sold_count":       sold_count,
         "created_at":       scanned_at,
     }).execute()
 
@@ -770,6 +772,9 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
 
 def process_legacy_photo(file_info):
     old_name = file_info['name']
+    # Skip internal/system paths (anything starting with underscore)
+    if old_name.startswith("_") or "/" in old_name and old_name.split("/")[-1].startswith("_"):
+        return
     print(f"📸 Legacy scan: {old_name}")
 
     try:
@@ -831,6 +836,7 @@ def process_legacy_photo(file_info):
         active_high  = price_used_high if price_used_high > 0 else price_new_high
         price_note   = "new" if price_used == 0 and price_new > 0 else ""
 
+        sold_count = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
         supabase.table("listings").insert({
             "business_id":      business_id,
             "title":            title,
@@ -847,6 +853,7 @@ def process_legacy_photo(file_info):
             "photo_id":         photo_id,
             "condition":        condition,
             "status":           "scanned",
+            "sold_count":       sold_count,
             "created_at":       scanned_at,
         }).execute()
 
