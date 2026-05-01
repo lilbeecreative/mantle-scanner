@@ -786,6 +786,10 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
 
 def process_legacy_photo(file_info):
     old_name = file_info['name']
+    # Skip system files (underscore-prefixed) and intake photos (uploaded for inventory tracking, not scanning)
+    base = old_name.split("/")[-1] if "/" in old_name else old_name
+    if base.startswith("_") or base.startswith("intake_"):
+        return
     # Skip internal/system paths (anything starting with underscore)
     if old_name.startswith("_") or "/" in old_name and old_name.split("/")[-1].startswith("_"):
         return
