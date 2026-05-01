@@ -846,13 +846,13 @@ def process_legacy_photo(file_info):
         price_note   = "new" if price_used == 0 and price_new > 0 else ""
 
         # Sold count: prefer eBay API data, fall back to Gemini's web-search confirmation
-    api_sc = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
-    if api_sc > 0:
-        sold_count = api_sc
-    elif pricing_tier == "SOLD_COMPS" and data_sources_n > 0:
-        sold_count = data_sources_n
-    else:
-        sold_count = 0
+        api_sc = (len(ebay_data.get("sold_used", []) or []) + len(ebay_data.get("sold_new", []) or [])) if isinstance(ebay_data, dict) else 0
+        if api_sc > 0:
+            sold_count = api_sc
+        elif pricing_tier == "SOLD_COMPS" and data_sources_n > 0:
+            sold_count = data_sources_n
+        else:
+            sold_count = 0
         supabase.table("listings").insert({
             "business_id":      business_id,
             "title":            title,
