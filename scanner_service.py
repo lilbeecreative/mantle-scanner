@@ -329,7 +329,7 @@ If a part number exists, RESEARCH IT to confirm correctness.
 Improve the title if research reveals the actual product name.
 NEVER keep generic words like Empty Bag, Industrial Part, Unknown Item.""" if id_title else ""
 
-    return f"""You are a senior industrial parts pricing specialist analyzing {photo_count} photo(s) for eBay resale.
+    return f"""You are a senior resale pricing specialist analyzing {photo_count} photo(s) for eBay resale. You price all types of items — electronics, clothing, collectibles, tools, toys, sporting goods, industrial parts, and anything else people sell on eBay.
 {id_section}
 
 {market_section}
@@ -480,7 +480,7 @@ def process_group(group: dict):
     print(f"   \U0001f50d Step 1: Identifying item from photos...")
     title_for_ebay = ""
     try:
-        id_prompt = """You are an industrial parts forensic identifier. Your job is to read what is actually on the part - not what you think it is.
+        id_prompt = """You are an expert item identifier for eBay resale. Your job is to identify what the item is, read any text, model numbers, brand names, or part numbers visible in the photo.
 
 STAGE 1 - TRANSCRIBE
 Read every character on the item. Treat this like evidence - transcribe exactly what is written, not what makes sense:
@@ -556,7 +556,7 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
                     contents=[*image_parts, id_prompt],
                     config=types.GenerateContentConfig(
                         temperature=0.0,
-                        system_instruction="You are an expert industrial parts identifier specializing in reading part numbers, model numbers, and brand names from photos. Your PRIMARY job is to find any alphanumeric codes on the item and transcribe them exactly. Part numbers are the most valuable piece of information — they unlock everything else. Even partial numbers are valuable. Read every character carefully.",
+                        system_instruction="You are an expert item identifier for eBay resale. Identify what the item is, its brand, model, and any alphanumeric codes visible. For all items read text carefully. For parts and electronics, part numbers unlock pricing — transcribe them exactly.",
                         response_mime_type="application/json",
                         response_schema=PartIdentification,
                     )
@@ -592,7 +592,7 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
                     contents=[*image_parts, id_prompt],
                     config=types.GenerateContentConfig(
                         temperature=0.0,
-                        system_instruction="You are an expert industrial parts identifier specializing in reading part numbers, model numbers, and brand names from photos. Your PRIMARY job is to find any alphanumeric codes on the item and transcribe them exactly. Part numbers are the most valuable piece of information — they unlock everything else. Even partial numbers are valuable. Read every character carefully.",
+                        system_instruction="You are an expert item identifier for eBay resale. Identify what the item is, its brand, model, and any alphanumeric codes visible. For all items read text carefully. For parts and electronics, part numbers unlock pricing — transcribe them exactly.",
                         response_mime_type="application/json",
                         response_schema=PartIdentification,
                     )
@@ -646,7 +646,7 @@ CHAIN OF THOUGHT: Fill raw_text_read first, then verified_brand, then verified_p
         cfg = types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())],
             temperature=0.1,
-            system_instruction="You are an expert industrial parts resale pricing specialist. You identify parts precisely from photos, search eBay for real sold prices, and return accurate structured data. Never guess manufacturer names — only state brands you can read on the part."
+            system_instruction="You are an expert resale pricing specialist. You identify items precisely from photos, search eBay for real sold prices, and return accurate structured data. Never guess brand names — only state brands you can read on the item."
         )
         response = None
         for _attempt in range(3):
