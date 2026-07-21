@@ -672,6 +672,8 @@ def process_group(group: dict):
     # ---- STEP 1: Structured ID pass using Pydantic schema ----
     print(f"   \U0001f50d Step 1: Identifying item from photos...")
     title_for_ebay = ""
+    verified_brand = ""
+    verified_pn    = ""
     try:
         id_prompt = """You are an expert item identifier for eBay resale. Your job is to identify what the item is, read any text, model numbers, brand names, or part numbers visible in the photo.
 
